@@ -1,0 +1,327 @@
+<section id="members-page" class="module-view" hidden>
+  <div class="module-titlebar">
+    <div><p class="eyebrow">Directory</p><h2>Members</h2><p id="member-page-count" class="module-caption">Loading member records...</p></div>
+  </div>
+  <section class="module-panel">
+    <div class="member-actions-row">
+      <label class="module-search"><span class="material-symbols-rounded">search</span><input id="member-page-search" type="search" placeholder="Search by full name, Member ID, or contact number..."></label>
+      <div class="action-buttons">
+        <button id="trash-members-button" class="module-button" type="button"><span class="material-symbols-rounded">delete</span>Trash <span id="trash-count" class="count-chip">0</span></button>
+        <button id="add-member-button" class="module-button primary" type="button"><span class="material-symbols-rounded">person_add</span>Add Member</button>
+        <button id="import-members-button" class="module-button" type="button"><span class="material-symbols-rounded">upload</span>Import Data</button>
+        <button id="export-members-button" class="module-button" type="button"><span class="material-symbols-rounded">download</span>Export</button>
+        <input id="member-csv-file" type="file" accept=".csv,text/csv" hidden>
+      </div>
+    </div>
+    <div class="member-filter-row">
+      <span class="filter-label"><span class="material-symbols-rounded">filter_list</span>Filters:</span>
+      <select id="member-status-filter" class="module-select"><option value="">All Membership Statuses</option><option>Active</option><option>Inactive</option><option>On &amp; Off</option></select>
+      <select id="member-category-filter" class="module-select"><option value="">All Categories</option><option>Junior</option><option>Senior</option></select>
+      <select id="member-activity-filter" class="module-select"><option value="">All Activity Statuses</option><option>Regular</option><option>Active</option><option>At Risk</option></select>
+      <select id="member-committee-filter" class="module-select committee-select"><option value="">All Committees</option></select>
+      <span id="member-filter-count" class="filter-count"></span>
+    </div>
+    <div class="module-table-scroll members-directory-scroll">
+      <table class="module-table members-directory-table">
+        <thead><tr><th>Member ID</th><th>Full Name</th><th>Birthday</th><th>Sabbath Date</th><th>Category</th><th>Membership Status</th><th>Activity Status</th><th>Committees</th><th>Attendance Rate</th><th>Last Attended</th><th>Actions</th></tr></thead>
+        <tbody id="members-directory-rows"><tr><td colspan="11" class="module-empty">Loading members...</td></tr></tbody>
+      </table>
+    </div>
+    <div class="module-pagination"><span id="members-page-range"></span><div id="members-page-buttons"></div></div>
+  </section>
+</section>
+
+<dialog id="member-editor" class="module-dialog">
+  <form id="member-editor-form" method="dialog">
+    <div class="dialog-heading"><div><p class="eyebrow">Member record</p><h2 id="member-editor-title">Add Member</h2></div><button class="icon-button" type="button" data-close-dialog="member-editor" aria-label="Close"><span class="material-symbols-rounded">close</span></button></div>
+    <div class="form-grid">
+      <label>Member ID<input id="edit-member-id" name="memberId" required maxlength="40" placeholder="M-1065"></label>
+      <label>Full name<input id="edit-member-name" name="fullName" maxlength="160" placeholder="Full name"></label>
+      <label>Contact number<input id="edit-member-contact" name="contactNumber" maxlength="40" placeholder="Contact number"></label>
+      <label>Email<input id="edit-member-email" name="email" type="email" maxlength="160"></label>
+      <label>Age<input id="edit-member-age" name="age" type="number" min="0" max="120"></label>
+      <label>Birthday<input id="edit-member-birthday" name="birthday" type="date"></label>
+      <label>Sabbath Date<input id="edit-member-sabbath-date" name="sabbathDate" type="date"></label>
+      <label>Gender<select id="edit-member-gender" name="gender"><option value="">Select</option><option>Female</option><option>Male</option><option>Other</option></select></label>
+      <label>Membership status<select id="edit-member-status" name="membershipStatus"><option>Active</option><option>Inactive</option><option>On &amp; Off</option></select></label>
+      <label>Category<select id="edit-member-category" name="category"><option>Junior</option><option>Senior</option></select></label>
+      <label>Student status<select id="edit-member-student" name="studentStatus"><option>Student</option><option>Non-Student</option></select></label>
+      <label>Employment status<select id="edit-member-employment" name="employmentStatus"><option>Unemployed</option><option>Employed</option></select></label>
+      <label class="form-wide">Committees<input id="edit-member-committees" name="committees" placeholder="Separate multiple committees with commas"></label>
+      <label class="form-wide">Notes<textarea id="edit-member-notes" name="notes" rows="3"></textarea></label>
+    </div>
+    <p class="module-help">Birthday and Sabbath Date columns are added to MEMBERS automatically if they are missing.</p>
+    <div class="dialog-actions"><button class="module-button" type="button" data-close-dialog="member-editor">Cancel</button><button id="save-member-button" class="module-button primary" type="submit">Save Member</button></div>
+  </form>
+</dialog>
+
+<dialog id="member-trash-dialog" class="module-dialog">
+  <div class="dialog-heading"><div><p class="eyebrow">Removed records</p><h2>Member Trash</h2></div><button class="icon-button" type="button" data-close-dialog="member-trash-dialog" aria-label="Close"><span class="material-symbols-rounded">close</span></button></div>
+  <div class="module-table-scroll"><table class="module-table"><thead><tr><th>Member ID</th><th>Name</th><th>Actions</th></tr></thead><tbody id="trash-member-rows"><tr><td colspan="3" class="module-empty">Loading trash...</td></tr></tbody></table></div>
+</dialog>
+
+<script>
+  const membersPageState = { rows: [], trash: [], page: 1, pageSize: 25, editId: null, expandedMember: null };
+
+  async function loadMembersPage() {
+    if (state.page !== 'Members') return;
+    try {
+      membersPageState.rows = await apiCall('getAllMembers');
+      renderMembersDirectory();
+      const trash = await apiCall('getDeletedMembers');
+      membersPageState.trash = trash;
+      document.getElementById('trash-count').textContent = formatNumber(trash.length);
+      state.loadedPages.Members = true;
+    } catch (error) { showToast(error.message || 'Unable to load members.', 'error'); }
+  }
+
+  function selectedMembers() {
+    const query = document.getElementById('member-page-search').value.trim().toLowerCase();
+    const status = document.getElementById('member-status-filter').value.toLowerCase();
+    const category = document.getElementById('member-category-filter').value.toLowerCase();
+    const activity = document.getElementById('member-activity-filter').value.toLowerCase();
+    const committee = document.getElementById('member-committee-filter').value.toLowerCase();
+    return membersPageState.rows.filter(member =>
+      `${member.memberId} ${member.name} ${member.contactNumber} ${member.email}`.toLowerCase().includes(query) &&
+      (!status || member.membershipStatus.toLowerCase() === status) &&
+      (!category || member.category.toLowerCase() === category) &&
+      (!activity || member.activityStatus.toLowerCase() === activity) &&
+      (!committee || member.committees.toLowerCase().split(/[,;]+/).map(value => value.trim()).includes(committee))
+    );
+  }
+
+  function renderMembersDirectory() {
+    const rows = selectedMembers();
+    const tbody = document.getElementById('members-directory-rows');
+    const totalPages = Math.max(1, Math.ceil(rows.length / membersPageState.pageSize));
+    membersPageState.page = Math.min(membersPageState.page, totalPages);
+    const first = (membersPageState.page - 1) * membersPageState.pageSize;
+    const visible = rows.slice(first, first + membersPageState.pageSize);
+    document.getElementById('member-page-count').textContent = `${formatNumber(membersPageState.rows.length)} total member records`;
+    document.getElementById('member-filter-count').textContent = `Found ${formatNumber(rows.length)} member(s)`;
+    document.getElementById('members-page-range').textContent = rows.length ? `Showing ${first + 1}–${Math.min(first + membersPageState.pageSize, rows.length)} of ${rows.length}` : 'No members found';
+    tbody.replaceChildren();
+    if (!visible.length) {
+      const row = document.createElement('tr'); const cell = document.createElement('td');
+      cell.colSpan = 11; cell.className = 'module-empty'; cell.textContent = 'No members match these filters.'; row.appendChild(cell); tbody.appendChild(row);
+    }
+    visible.forEach(member => {
+      const row = document.createElement('tr'); row.className = 'directory-member-row';
+      const id = document.createElement('td'); id.className = 'id-cell'; id.textContent = member.memberId;
+      const name = document.createElement('td'); name.innerHTML = `<strong>${escapeHtml(member.name || 'Name not recorded')}</strong>${member.contactNumber ? `<small>${escapeHtml(member.contactNumber)}</small>` : ''}${member.age ? `<small>${escapeHtml(member.age)} yrs</small>` : ''}`;
+      const birthday = document.createElement('td'); birthday.textContent = member.birthday || '—';
+      const sabbathDate = document.createElement('td'); sabbathDate.textContent = member.sabbathDate || '—';
+      const category = document.createElement('td'); category.appendChild(makeBadge(member.category, 'purple'));
+      const status = document.createElement('td'); status.appendChild(makeBadge(member.membershipStatus, member.membershipStatus === 'Active' ? 'green' : member.membershipStatus === 'Inactive' ? 'red' : 'amber'));
+      const activity = document.createElement('td'); activity.appendChild(makeBadge(member.activityStatus || 'No data', member.activityStatus === 'Regular' ? 'blue' : member.activityStatus === 'At Risk' ? 'amber' : 'blue'));
+      const committees = document.createElement('td');
+      String(member.committees || '').split(/[,;]+/).map(value => value.trim()).filter(Boolean).slice(0, 3).forEach(value => committees.appendChild(makeBadge(value, 'quiet')));
+      const rate = document.createElement('td'); rate.className = 'rate-cell'; rate.textContent = formatPercent(member.attendancePercent, 0);
+      const last = document.createElement('td'); last.textContent = member.lastAttendanceDate || '—';
+      const actions = document.createElement('td'); actions.className = 'row-actions';
+      const viewButton = actionButton('visibility', 'View member', () => showMemberDetails(member));
+      viewButton.setAttribute('aria-expanded', String(membersPageState.expandedMember === member.memberId));
+      actions.append(viewButton, actionButton('edit', 'Edit member', () => openMemberEditor(member)), actionButton('inventory_2', 'Mark inactive', () => archiveMemberFromPage(member)), actionButton('delete', 'Move to Trash', () => trashMemberFromPage(member)));
+      row.append(id, name, birthday, sabbathDate, category, status, activity, committees, rate, last, actions); tbody.appendChild(row);
+      if (membersPageState.expandedMember === member.memberId) tbody.appendChild(renderDirectoryMemberDetails(member));
+    });
+    renderMemberPageButtons(totalPages);
+    const committeeSelect = document.getElementById('member-committee-filter');
+    const selected = committeeSelect.value;
+    const committees = [...new Set(membersPageState.rows.flatMap(member => String(member.committees || '').split(/[,;]+/).map(value => value.trim()).filter(Boolean)))].sort();
+    committeeSelect.replaceChildren(new Option('All Committees', ''));
+    committees.forEach(value => committeeSelect.add(new Option(value, value.toLowerCase())));
+    committeeSelect.value = selected;
+  }
+
+  function renderMemberPageButtons(totalPages) {
+    const container = document.getElementById('members-page-buttons'); container.replaceChildren();
+    const previous = document.createElement('button'); previous.className = 'page-button'; previous.textContent = '‹'; previous.disabled = membersPageState.page <= 1; previous.onclick = () => { membersPageState.page -= 1; renderMembersDirectory(); }; container.appendChild(previous);
+    const next = document.createElement('button'); next.className = 'page-button'; next.textContent = '›'; next.disabled = membersPageState.page >= totalPages; next.onclick = () => { membersPageState.page += 1; renderMembersDirectory(); }; container.appendChild(next);
+  }
+
+  function actionButton(icon, title, handler) {
+    const button = document.createElement('button'); button.type = 'button'; button.className = 'row-icon-button'; button.title = title; button.setAttribute('aria-label', title);
+    const glyph = document.createElement('span'); glyph.className = 'material-symbols-rounded'; glyph.textContent = icon; button.appendChild(glyph);
+    button.addEventListener('click', event => {
+      const result = handler(event);
+      if (result && typeof result.then === 'function') {
+        const label = /trash|delete/i.test(title) ? 'Deleting...' : /inactive|archive/i.test(title) ? 'Archiving...' : /restore/i.test(title) ? 'Restoring...' : 'Working...';
+        window.runButtonAction(button, () => result, label);
+      }
+    });
+    return button;
+  }
+
+  function openMemberEditor(member) {
+    membersPageState.editId = member ? member.memberId : null;
+    const form = document.getElementById('member-editor-form'); form.reset();
+    document.getElementById('member-editor-title').textContent = member ? `Edit ${member.memberId}` : 'Add Member';
+    document.getElementById('edit-member-id').disabled = Boolean(member);
+    document.getElementById('edit-member-id').value = member ? member.memberId : '';
+    document.getElementById('edit-member-name').value = member ? member.name : '';
+    document.getElementById('edit-member-contact').value = member ? member.contactNumber : '';
+    document.getElementById('edit-member-email').value = member ? member.email : '';
+    document.getElementById('edit-member-age').value = member ? member.age : '';
+    document.getElementById('edit-member-birthday').value = member ? member.birthday : '';
+    document.getElementById('edit-member-sabbath-date').value = member ? member.sabbathDate : '';
+    document.getElementById('edit-member-gender').value = member ? member.gender : '';
+    document.getElementById('edit-member-status').value = member ? member.membershipStatus : 'Active';
+    document.getElementById('edit-member-category').value = member ? member.category : 'Junior';
+    document.getElementById('edit-member-student').value = member ? member.studentStatus : 'Student';
+    document.getElementById('edit-member-employment').value = member ? member.employmentStatus : 'Unemployed';
+    document.getElementById('edit-member-committees').value = member ? member.committees : '';
+    document.getElementById('edit-member-notes').value = member ? member.notes : '';
+    document.getElementById('member-editor').showModal();
+  }
+
+  async function submitMemberForm(event) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const payload = Object.fromEntries(new FormData(form).entries());
+    payload.memberId = document.getElementById('edit-member-id').value.trim();
+    payload.age = payload.age ? Number(payload.age) : '';
+    payload.isEdit = Boolean(membersPageState.editId);
+    const button = document.getElementById('save-member-button');
+    await window.runButtonAction(button, async () => {
+      try {
+        const result = await apiCall('saveMember', payload);
+        document.getElementById('member-editor').close(); showToast(result.message, 'success'); await loadMembersPage();
+      } catch (error) { showToast(error.message || 'Unable to save member.', 'error'); }
+    }, payload.isEdit ? 'Updating...' : 'Saving...');
+  }
+
+  async function archiveMemberFromPage(member) {
+    if (!window.confirm(`Mark ${member.memberId} as inactive?`)) return;
+    try { const result = await apiCall('archiveMember', member.memberId); showToast(result.message, 'success'); await loadMembersPage(); }
+    catch (error) { showToast(error.message || 'Unable to update member.', 'error'); }
+  }
+
+  async function trashMemberFromPage(member) {
+    if (!window.confirm(`Move ${member.memberId} to Trash? Attendance history will be retained.`)) return;
+    try { const result = await apiCall('moveMemberToTrash', member.memberId); showToast(result.message, 'success'); await loadMembersPage(); }
+    catch (error) { showToast(error.message || 'Unable to move member.', 'error'); }
+  }
+
+  function renderDirectoryMemberDetails(member) {
+    const row = document.createElement('tr'); row.className = 'directory-member-detail-row';
+    const cell = document.createElement('td'); cell.colSpan = 11;
+    const grid = document.createElement('div'); grid.className = 'detail-grid directory-detail-grid';
+    [
+      ['Member ID', member.memberId], ['Full name', member.name], ['Contact number', member.contactNumber],
+      ['Email', member.email], ['Age', member.age], ['Birthday', member.birthday], ['Sabbath Date', member.sabbathDate], ['Gender', member.gender],
+      ['Category', member.category], ['Membership status', member.membershipStatus], ['Activity status', member.activityStatus],
+      ['Student status', member.studentStatus], ['Employment status', member.employmentStatus], ['Committees', member.committees],
+      ['Attendance rate', formatPercent(member.attendancePercent)], ['Last attended', member.lastAttendanceDate],
+      ['Registered', member.dateRegistered], ['Attendance count', formatNumber(member.attendanceCount)], ['Notes', member.notes]
+    ].forEach(([label, value]) => {
+      const field = document.createElement('div'); field.className = 'directory-detail-field';
+      const title = document.createElement('span'); title.textContent = label;
+      const detail = document.createElement('strong');
+      detail.textContent = value === null || value === undefined || value === '' ? 'Not recorded' : String(value);
+      field.append(title, detail); grid.appendChild(field);
+    });
+    const actions = document.createElement('div'); actions.className = 'dialog-actions';
+    actions.append(
+      directoryDetailAction('Edit', 'edit', () => openMemberEditor(member)),
+      directoryDetailAction('Archive', 'inventory_2', () => archiveMemberFromPage(member)),
+      directoryDetailAction('Delete', 'delete', () => trashMemberFromPage(member))
+    );
+    cell.append(grid, actions); row.appendChild(cell); return row;
+  }
+
+  function directoryDetailAction(label, icon, handler) {
+    const button = document.createElement('button'); button.type = 'button'; button.className = 'module-button';
+    const glyph = document.createElement('span'); glyph.className = 'material-symbols-rounded'; glyph.textContent = icon;
+    button.append(glyph, document.createTextNode(label));
+    button.addEventListener('click', event => {
+      const result = handler(event);
+      if (result && typeof result.then === 'function') {
+        const loadingLabel = label === 'Delete' ? 'Deleting...' : label === 'Archive' ? 'Archiving...' : 'Working...';
+        window.runButtonAction(button, () => result, loadingLabel);
+      }
+    });
+    return button;
+  }
+
+  function showMemberDetails(member) {
+    membersPageState.expandedMember = membersPageState.expandedMember === member.memberId ? null : member.memberId;
+    renderMembersDirectory();
+  }
+
+  async function showMemberTrash() {
+    const body = document.getElementById('trash-member-rows'); body.replaceChildren();
+    try {
+      membersPageState.trash = await apiCall('getDeletedMembers');
+      document.getElementById('trash-count').textContent = formatNumber(membersPageState.trash.length);
+      if (!membersPageState.trash.length) { const row = body.insertRow(); const cell = row.insertCell(); cell.colSpan = 3; cell.className = 'module-empty'; cell.textContent = 'Trash is empty.'; }
+      membersPageState.trash.forEach(member => {
+        const row = body.insertRow(); row.insertCell().textContent = member.memberId; row.insertCell().textContent = member.name || 'Name not recorded';
+        const actions = row.insertCell(); actions.appendChild(actionButton('restore', 'Restore member', async () => {
+          try { const result = await apiCall('restoreDeletedMember', member.memberId); showToast(result.message, 'success'); await showMemberTrash(); await loadMembersPage(); }
+          catch (error) { showToast(error.message || 'Unable to restore member.', 'error'); }
+        }));
+      });
+      document.getElementById('member-trash-dialog').showModal();
+    } catch (error) { showToast(error.message || 'Unable to load Trash.', 'error'); }
+  }
+
+  function parseMemberCsv(text) {
+    const rows = []; let row = []; let cell = ''; let quoted = false;
+    for (let index = 0; index < text.length; index += 1) {
+      const char = text[index];
+      if (char === '"' && quoted && text[index + 1] === '"') { cell += '"'; index += 1; }
+      else if (char === '"') quoted = !quoted;
+      else if (char === ',' && !quoted) { row.push(cell); cell = ''; }
+      else if ((char === '\n' || char === '\r') && !quoted) { if (char === '\r' && text[index + 1] === '\n') index += 1; row.push(cell); rows.push(row); row = []; cell = ''; }
+      else cell += char;
+    }
+    if (cell || row.length) { row.push(cell); rows.push(row); }
+    return rows.filter(line => line.some(value => value.trim()));
+  }
+
+  async function importMemberCsv(file) {
+    if (!file) return;
+    try {
+      const rows = parseMemberCsv(await file.text());
+      if (rows.length < 2) throw new Error('The CSV needs a header row and at least one member.');
+      const headers = rows[0].map(value => value.trim().toLowerCase().replace(/[^a-z0-9]/g, ''));
+      const column = aliases => headers.findIndex(header => aliases.includes(header));
+      const objects = rows.slice(1).map(row => ({
+        memberId: row[column(['memberid'])] || '', fullName: row[column(['fullname', 'membername', 'name'])] || '',
+        contactNumber: row[column(['contactnumber', 'phonenumber', 'mobilenumber', 'phone'])] || '',
+        membershipStatus: row[column(['membershipstatus'])] || 'Active', category: row[column(['membercategory', 'category'])] || 'Junior',
+        gender: row[column(['gender'])] || '', age: row[column(['age'])] || '',
+        birthday: row[column(['birthday', 'birthdate', 'dateofbirth'])] || '',
+        sabbathDate: row[column(['sabbathdate', 'sabbath'])] || '', committees: row[column(['committees'])] || '',
+        studentStatus: row[column(['studentstatus'])] || '', employmentStatus: row[column(['employmentstatus'])] || '', notes: row[column(['notes'])] || ''
+      })).filter(member => member.memberId);
+      if (!objects.length) throw new Error('No rows contain a Member ID column value.');
+      const result = await apiCall('importMembers', objects); showToast(result.message, 'success'); await loadMembersPage();
+    } catch (error) { showToast(error.message || 'CSV import failed.', 'error'); }
+    finally { document.getElementById('member-csv-file').value = ''; }
+  }
+
+  function exportMembersCsv() {
+    const data = selectedMembers();
+    const columns = ['Member ID','Full Name','Contact Number','Birthday','Sabbath Date','Membership Status','Member Category','Activity Status','Committees','Attendance Percentage','Last Attendance Date'];
+    const rows = [columns, ...data.map(member => [member.memberId,member.name,member.contactNumber,member.birthday,member.sabbathDate,member.membershipStatus,member.category,member.activityStatus,member.committees,member.attendancePercent === null ? '' : (member.attendancePercent * 100).toFixed(1) + '%',member.lastAttendanceDate])];
+    const csv = rows.map(row => row.map(value => `"${String(value ?? '').replace(/"/g, '""')}"`).join(',')).join('\r\n');
+    const link = document.createElement('a'); link.href = URL.createObjectURL(new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8' })); link.download = 'members.csv'; link.click(); URL.revokeObjectURL(link.href);
+    logAction('EXPORT_MEMBERS', { count: data.length });
+  }
+
+  function bindMembersPage() {
+    ['member-page-search','member-status-filter','member-category-filter','member-activity-filter','member-committee-filter'].forEach(id => document.getElementById(id).addEventListener(id === 'member-page-search' ? 'input' : 'change', () => { membersPageState.page = 1; renderMembersDirectory(); }));
+    document.getElementById('add-member-button').addEventListener('click', () => openMemberEditor(null));
+    document.getElementById('member-editor-form').addEventListener('submit', submitMemberForm);
+    document.getElementById('trash-members-button').addEventListener('click', event => window.runButtonAction(event.currentTarget, showMemberTrash, 'Loading trash...'));
+    document.getElementById('import-members-button').addEventListener('click', () => document.getElementById('member-csv-file').click());
+    document.getElementById('member-csv-file').addEventListener('change', event => {
+      const file = event.target.files[0];
+      if (file) window.runButtonAction(document.getElementById('import-members-button'), () => importMemberCsv(file), 'Importing...');
+    });
+    document.getElementById('export-members-button').addEventListener('click', exportMembersCsv);
+  }
+  bindMembersPage();
+</script>

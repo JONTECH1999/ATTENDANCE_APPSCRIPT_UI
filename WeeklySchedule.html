@@ -1,0 +1,141 @@
+<section id="weekly-schedule-page" class="module-view" hidden>
+  <div class="module-titlebar schedule-titlebar">
+    <div><p class="eyebrow">Events calendar</p><h2>Weekly Schedule</h2><p id="schedule-week-label" class="module-caption">Loading events and schedules...</p></div>
+    <div class="schedule-week-controls"><button id="schedule-prev-week" class="module-button square-button" type="button" aria-label="Previous week"><span class="material-symbols-rounded">chevron_left</span></button><button id="schedule-today" class="module-button" type="button">This Week</button><button id="schedule-next-week" class="module-button square-button" type="button" aria-label="Next week"><span class="material-symbols-rounded">chevron_right</span></button></div>
+  </div>
+  <div id="weekly-event-list" class="weekly-event-list"><section class="module-panel module-empty">Loading events...</section></div>
+</section>
+
+<dialog id="schedule-editor" class="module-dialog">
+  <form id="schedule-editor-form" method="dialog">
+    <div class="dialog-heading"><div><p class="eyebrow">Event schedule</p><h2 id="schedule-editor-title">Add Schedule</h2></div><button class="icon-button" type="button" data-close-dialog="schedule-editor" aria-label="Close"><span class="material-symbols-rounded">close</span></button></div>
+    <input name="scheduleId" type="hidden">
+    <label>Event<select id="schedule-event-choice" name="eventId" required></select></label>
+    <div class="form-grid"><label>Schedule name<input name="name" required maxlength="120" placeholder="Wednesday 3:30 AM"></label><label>Repeats on<select name="dayOfWeek" id="schedule-weekday"><option value="">One-time date</option><option>Monday</option><option>Tuesday</option><option>Wednesday</option><option>Thursday</option><option>Friday</option><option>Saturday</option><option>Sunday</option></select></label><label>Date<input name="date" type="date"></label><label>Start time<input name="time" type="text" inputmode="text" autocomplete="off" placeholder="3:30 AM"><small>Enter time with AM or PM, e.g. 7:00 PM.</small></label><label>End time<input name="endTime" type="text" inputmode="text" autocomplete="off" placeholder="5:30 AM"><small>Enter time with AM or PM. If blank, live status treats the gathering as 2 hours.</small></label><label class="form-wide">MPRO Incharge<input name="mproIncharge" maxlength="500"></label><label class="form-wide">Officers Assigned<input name="officersAssigned" maxlength="500"></label><label class="form-wide">Location<input name="location" maxlength="160"></label><label class="form-wide">Notes<input name="notes" maxlength="500"></label></div>
+    <div class="dialog-actions"><button class="module-button" type="button" data-close-dialog="schedule-editor">Cancel</button><button id="schedule-editor-submit" class="module-button primary" type="submit">Add Schedule</button></div>
+  </form>
+</dialog>
+
+<script>
+  const weeklyScheduleState={events:[],weekOffset:0};
+
+  function weekStartDate(offset) {
+    const date=new Date();date.setHours(12,0,0,0);date.setDate(date.getDate()-((date.getDay()+6)%7)+offset*7);return date;
+  }
+
+  function weekEndDate(offset) { const date=weekStartDate(offset);date.setDate(date.getDate()+6);return date; }
+
+  function inVisibleWeek(dateValue) {
+    if(!dateValue)return false;const date=new Date(`${dateValue}T12:00:00`);const start=weekStartDate(weeklyScheduleState.weekOffset);const end=weekEndDate(weeklyScheduleState.weekOffset);return date>=start&&date<=end;
+  }
+
+  function scheduleOccurrenceDate(schedule, weekStart) {
+    if (!schedule.dayOfWeek) return schedule.date || '';
+    const weekdays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const scheduleDay = String(schedule.dayOfWeek).trim().toLowerCase();
+    const dayIndex = weekdays.findIndex(day => day.toLowerCase() === scheduleDay || day.slice(0, 3).toLowerCase() === scheduleDay);
+    if (dayIndex < 0) return '';
+    const date = new Date(weekStart);
+    date.setDate(date.getDate() + (dayIndex - date.getDay() + 7) % 7);
+    return dateInputValue(date);
+  }
+
+  function formatCalendarDate(dateValue) {
+    if (!dateValue) return 'Date not set';
+    const date = new Date(`${dateValue}T12:00:00`);
+    return isNaN(date.getTime())
+      ? dateValue
+      : new Intl.DateTimeFormat(undefined, { month: 'long', day: 'numeric', year: 'numeric' }).format(date);
+  }
+
+  async function loadWeeklySchedule() {
+    if(state.page!=='Weekly Schedule')return;
+    try{weeklyScheduleState.events=await apiCall('getAttendanceEvents');renderWeeklySchedule();state.loadedPages['Weekly Schedule']=true;}
+    catch(error){showToast(error.message||'Unable to load weekly schedules.','error');}
+  }
+
+  function renderWeeklySchedule() {
+    const start=weekStartDate(weeklyScheduleState.weekOffset);const end=weekEndDate(weeklyScheduleState.weekOffset);
+    document.getElementById('schedule-week-label').textContent=`${dateInputValue(start)} to ${dateInputValue(end)} · ${formatNumber(weeklyScheduleState.events.length)} events`;
+    const list=document.getElementById('weekly-event-list');list.replaceChildren();
+    const events=weeklyScheduleState.events.map(event=>({...event,schedules:event.schedules.filter(schedule=>schedule.dayOfWeek||inVisibleWeek(schedule.date||event.date))})).filter(event=>event.schedules.length||inVisibleWeek(event.date));
+    if(!events.length){const empty=document.createElement('section');empty.className='module-panel module-empty';empty.textContent='No events or schedules found for this week.';list.appendChild(empty);return;}
+    events.forEach(event=>{
+      const panel=document.createElement('section');panel.className='module-panel event-card';
+      const head=document.createElement('div');head.className='event-card-head';
+      const info=document.createElement('div');info.className='event-summary';
+      const title=document.createElement('strong');title.textContent=event.name;
+      const badges=document.createElement('span');badges.className='event-badges';[event.eventId,event.category,event.status].filter(Boolean).forEach((value,index)=>badges.appendChild(makeBadge(value,index===1?'blue':'quiet')));
+      const detail=document.createElement('p');detail.textContent=`${event.date||'Dates vary'}  •  ${event.location||'Location not set'}${event.description?`  •  ${event.description}`:''}`;
+      info.append(title,badges,detail);
+      if(event.program){const program=document.createElement('details');program.className='weekly-event-program';const summary=document.createElement('summary');summary.textContent='View event program';const content=document.createElement('pre');content.textContent=event.program;program.append(summary,content);info.appendChild(program);}
+      const add=document.createElement('button');add.type='button';add.className='module-button success-outline';add.innerHTML='<span class="material-symbols-rounded">add</span>Add Schedule';add.addEventListener('click',()=>openScheduleEditor(event.eventId));
+      head.append(info,add);panel.appendChild(head);
+      const body=document.createElement('div');body.className='event-schedules-body';
+      const label=document.createElement('h3');label.textContent=`Assigned Schedules (${event.schedules.length})`;body.appendChild(label);
+      const grid=document.createElement('div');grid.className='schedule-card-grid';
+      event.schedules.forEach(schedule=>{
+        const card=document.createElement('article');card.className='schedule-card';
+        const cardTitle=document.createElement('strong');
+        cardTitle.textContent=schedule.dayOfWeek&&/^([A-Za-z]+)\s+\d{1,2}:\d{2}$/.test(schedule.name||'')?`${schedule.dayOfWeek} gathering`:formatScheduleName(schedule.name);
+        const scheduleId=document.createElement('small');scheduleId.className='schedule-id';scheduleId.textContent=schedule.scheduleId||'';
+        const occurrenceDate = scheduleOccurrenceDate(schedule, start) || event.date || '';
+        const date=document.createElement('span');date.textContent=`${schedule.dayOfWeek ? `${schedule.dayOfWeek} · ` : ''}${formatCalendarDate(occurrenceDate)}`;
+        const time=document.createElement('span');time.textContent=`${schedule.time?formatScheduleTime(schedule.time):'Time not set'}${schedule.endTime?` – ${formatScheduleTime(schedule.endTime)}`:''}`;
+        const location=document.createElement('span');location.textContent=schedule.location||event.location||'Location not set';
+        const mpro=document.createElement('span');mpro.textContent=`MPRO: ${schedule.mproIncharge||'Not assigned'}`;
+        const officers=document.createElement('span');officers.textContent=`Officers: ${schedule.officersAssigned||'Not assigned'}`;
+        [date,time,location,mpro,officers].forEach((item,index)=>{const icon=document.createElement('span');icon.className='material-symbols-rounded';icon.textContent=['calendar_month','schedule','location_on','person','groups'][index];item.prepend(icon);});
+        const actions=document.createElement('div');actions.className='schedule-card-actions';
+        const action=document.createElement('button');action.type='button';action.className='schedule-attendance-link';action.innerHTML='<span class="material-symbols-rounded">task_alt</span>Take Attendance';action.addEventListener('click',()=>{const wasLoaded=state.loadedPages['Fast Attendance'];fastAttendanceState.eventId=event.eventId;fastAttendanceState.scheduleId=schedule.scheduleId;fastAttendanceState.date=occurrenceDate;fastAttendanceState.requestedDate=occurrenceDate;fastAttendanceState.scheduleWasManuallySelected=true;navigateTo('Fast Attendance');if(wasLoaded)loadFastAttendance();});
+        const edit=document.createElement('button');edit.type='button';edit.className='schedule-attendance-link';edit.innerHTML='<span class="material-symbols-rounded">edit</span>Edit Schedule';edit.addEventListener('click',()=>openScheduleEditor(event.eventId,schedule));
+        actions.append(action,edit);
+        card.append(cardTitle,scheduleId,date,time,location,mpro,officers,actions);grid.appendChild(card);
+      });
+      body.appendChild(grid);panel.appendChild(body);list.appendChild(panel);
+    });
+  }
+
+  function openScheduleEditor(eventId) {
+    const schedule=arguments[1]||null;
+    const select=document.getElementById('schedule-event-choice');select.replaceChildren();weeklyScheduleState.events.forEach(event=>select.add(new Option(event.name,event.eventId)));
+    const form=document.getElementById('schedule-editor-form');form.reset();select.value=eventId||'';
+    form.elements.scheduleId.value=schedule?schedule.scheduleId:'';
+    form.elements.name.value=schedule?schedule.name:'';
+    form.elements.dayOfWeek.value=schedule?schedule.dayOfWeek||'':'';
+    form.elements.date.value=schedule?schedule.date||'':dateInputValue(new Date());
+    form.elements.time.value=schedule&&schedule.time?formatScheduleTime(schedule.time):'';
+    form.elements.endTime.value=schedule&&schedule.endTime?formatScheduleTime(schedule.endTime):'';
+    form.elements.mproIncharge.value=schedule?schedule.mproIncharge||'':'';
+    form.elements.officersAssigned.value=schedule?schedule.officersAssigned||'':'';
+    form.elements.location.value=schedule?schedule.location||'':'';
+    form.elements.notes.value=schedule?schedule.notes||'':'';
+    document.getElementById('schedule-editor-title').textContent=schedule?'Edit Schedule':'Add Schedule';
+    document.getElementById('schedule-editor-submit').textContent=schedule?'Save Schedule':'Add Schedule';
+    updateScheduleDateRequirement();
+    document.getElementById('schedule-editor').showModal();
+  }
+
+  function updateScheduleDateRequirement() {
+    const form=document.getElementById('schedule-editor-form');
+    form.elements.date.required=!form.elements.dayOfWeek.value;
+  }
+
+  async function submitScheduleForm(event) {
+    event.preventDefault();const data=Object.fromEntries(new FormData(event.currentTarget).entries());
+    const button=event.submitter||document.getElementById('schedule-editor-submit');
+    await window.runButtonAction(button,async()=>{
+      try{const result=await apiCall(data.scheduleId?'updateAttendanceSchedule':'addAttendanceSchedule',data);document.getElementById('schedule-editor').close();showToast(result.message,'success');await loadWeeklySchedule();await refreshLiveGatheringEvents();}
+      catch(error){showToast(error.message||'Unable to save schedule.','error');}
+    },data.scheduleId?'Updating...':'Saving...');
+  }
+
+  function bindWeeklySchedulePage() {
+    document.getElementById('schedule-prev-week').addEventListener('click',()=>{weeklyScheduleState.weekOffset-=1;renderWeeklySchedule();});
+    document.getElementById('schedule-next-week').addEventListener('click',()=>{weeklyScheduleState.weekOffset+=1;renderWeeklySchedule();});
+    document.getElementById('schedule-today').addEventListener('click',()=>{weeklyScheduleState.weekOffset=0;renderWeeklySchedule();});
+    document.getElementById('schedule-editor-form').addEventListener('submit',submitScheduleForm);
+    document.getElementById('schedule-weekday').addEventListener('change',updateScheduleDateRequirement);
+  }
+  bindWeeklySchedulePage();
+</script>

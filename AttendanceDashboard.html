@@ -1,0 +1,2117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="mobile-web-app-capable" content="yes">
+  <base target="_top">
+  <title>Members Statistics</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,400,0,0" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.8/dist/chart.umd.min.js"></script>
+  <style>
+    :root {
+      color-scheme: light;
+      --primary: #2563eb;
+      --primary-soft: #eaf0ff;
+      --secondary: #10b981;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+      --dark: #1f2937;
+      --ink: #182230;
+      --muted: #6b7787;
+      --line: #e5e9ef;
+      --surface: #fff;
+      --canvas: #f7f8fa;
+      --sidebar: #1f2937;
+      --shadow: 0 4px 18px #1720330a;
+    }
+    * { box-sizing: border-box; }
+    html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+    body { margin: 0; color: var(--ink); background: var(--canvas); font: 13px/1.5 "DM Sans", sans-serif; }
+    button, input, select { font: inherit; }
+    button { cursor: pointer; }
+    .material-symbols-rounded { font-size: 20px; line-height: 1; font-weight: normal; font-style: normal; letter-spacing: 0; text-transform: none; display: inline-block; white-space: nowrap; direction: ltr; font-feature-settings: "liga"; -webkit-font-feature-settings: "liga"; -webkit-font-smoothing: antialiased; }
+    .app-shell { min-height: 100vh; }
+    .sidebar { position: fixed; inset: 0 auto 0 0; z-index: 30; display: flex; flex-direction: column; width: 252px; padding: 21px 14px 14px; color: #f8fafc; background: var(--sidebar); }
+    .brand { display: flex; align-items: center; gap: 11px; padding: 0 10px 25px; }
+    .brand-icon { display: grid; place-items: center; width: 36px; height: 36px; color: white; background: var(--primary); border-radius: 9px; }
+    .brand-icon .material-symbols-rounded { font-size: 21px; }
+    .brand-copy strong { display: block; font: 800 13px "Manrope", sans-serif; letter-spacing: 0; }
+    .brand-copy span { display: block; margin-top: 1px; color: #aeb8c6; font-size: 10px; }
+    .nav-label { padding: 0 11px 8px; color: #9aa6b5; font-size: 9px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+    .nav-list { display: grid; gap: 3px; margin: 0; padding: 0; list-style: none; }
+    .nav-link { display: flex; align-items: center; gap: 11px; width: 100%; min-height: 41px; padding: 0 11px; color: #c9d1dc; background: transparent; border: 0; border-radius: 6px; text-align: left; font-size: 12px; font-weight: 550; transition: background .15s, color .15s; }
+    .nav-link .material-symbols-rounded { color: #aeb8c6; font-size: 19px; }
+    .nav-link:hover { color: white; background: #ffffff10; }
+    .nav-link.active { color: white; background: #2563eb; font-weight: 700; }
+    .nav-link.active .material-symbols-rounded { color: white; }
+    .sidebar-spacer { flex: 1; }
+    .sidebar-profile { display: flex; align-items: center; gap: 9px; padding: 12px 7px 3px; border-top: 1px solid #ffffff1a; }
+    .profile-avatar { display: grid; place-items: center; width: 33px; height: 33px; flex: 0 0 auto; color: #dbeafe; background: #40536d; border-radius: 50%; font-size: 11px; font-weight: 750; }
+    .profile-copy { min-width: 0; flex: 1; }
+    .profile-copy strong { display: block; overflow: hidden; color: white; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+    .profile-copy span { display: block; color: #aeb8c6; font-size: 9px; }
+    .profile-menu { display: grid; place-items: center; width: 29px; height: 29px; color: #c9d1dc; background: transparent; border: 0; border-radius: 5px; }
+    .profile-menu:hover { background: #ffffff12; }
+    .workspace { min-height: 100vh; margin-left: 252px; }
+    .topbar { position: sticky; top: 0; z-index: 15; display: flex; align-items: center; justify-content: space-between; gap: 14px; min-height: 69px; padding: 0 27px; background: var(--surface); border-bottom: 1px solid var(--line); }
+    .top-left { display: flex; align-items: center; gap: 12px; min-width: 0; }
+    h1 { margin: 0; font: 800 18px "Manrope", sans-serif; letter-spacing: 0; }
+    .top-subtitle { margin: 2px 0 0; color: var(--muted); font-size: 10px; }
+    .top-actions { display: flex; align-items: center; gap: 8px; }
+      .live-context { display: grid; flex: 0 1 225px; gap: 2px; min-width: 0; margin-left: auto; }
+      .live-clock { color: var(--muted); font-size: 9px; font-variant-numeric: tabular-nums; }
+      .live-gathering-title { overflow: hidden; color: var(--ink); font-size: 10px; font-weight: 750; text-overflow: ellipsis; white-space: nowrap; }
+      .live-gathering-detail { overflow: hidden; color: var(--muted); font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+    .date-control { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 10px; }
+    .date-control input { width: 126px; min-height: 34px; padding: 0 8px; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 5px; font-size: 10px; }
+    .search-control { position: relative; width: 190px; }
+    .search-control .material-symbols-rounded { position: absolute; top: 8px; left: 9px; color: #8793a2; font-size: 17px; pointer-events: none; }
+    .search-control input { width: 100%; min-height: 34px; padding: 0 9px 0 31px; color: var(--ink); background: var(--canvas); border: 1px solid transparent; border-radius: 5px; outline: 0; font-size: 11px; }
+    .search-control input:focus, .date-control input:focus, .filter-select:focus { border-color: #9bb5f7; outline: 2px solid #2563eb20; }
+    .icon-button { display: inline-grid; place-items: center; width: 35px; height: 35px; color: var(--ink); background: transparent; border: 1px solid transparent; border-radius: 5px; }
+    .icon-button:hover { background: var(--canvas); border-color: var(--line); }
+    .icon-button .material-symbols-rounded { font-size: 19px; }
+    .primary-button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 34px; padding: 0 11px; color: white; background: var(--primary); border: 1px solid var(--primary); border-radius: 5px; font-size: 10px; font-weight: 700; white-space: nowrap; }
+    .primary-button:hover { background: #1d4ed8; }
+    .primary-button .material-symbols-rounded { font-size: 16px; }
+    .mobile-toggle { display: none; }
+    .main-content { max-width: 1600px; margin: 0 auto; padding: 22px 27px 45px; }
+    .content-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; margin-bottom: 15px; }
+    .eyebrow { margin: 0 0 4px; color: var(--primary); font-size: 9px; font-weight: 750; letter-spacing: .1em; text-transform: uppercase; }
+    .content-heading h2 { margin: 0; font: 800 20px "Manrope", sans-serif; }
+    .content-heading p { margin: 4px 0 0; color: var(--muted); font-size: 11px; }
+    .heading-tools { display: flex; gap: 7px; }
+    .secondary-button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 34px; padding: 0 10px; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 5px; font-size: 10px; font-weight: 650; white-space: nowrap; }
+    .secondary-button:hover { background: var(--canvas); }
+    .secondary-button .material-symbols-rounded { font-size: 16px; }
+    .stats-cards { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 14px; }
+      .today-attendance-cards { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-bottom: 13px; }
+      .today-attendance-card { display: grid; align-content: space-between; gap: 5px; min-width: 0; min-height: 112px; padding: 12px 14px; background: var(--surface); border: 1px solid var(--line); border-radius: 4px; }
+      .today-attendance-card-label { color: var(--muted); font-size: 10px; font-weight: 650; }
+      .today-attendance-card strong { color: var(--ink); font: 800 36px/1 "Manrope", sans-serif; font-variant-numeric: tabular-nums; }
+      .today-attendance-card small { color: var(--muted); font-size: 9px; }
+      .today-attendance-card.featured { color: #ffffff; background: #111111; border-color: #111111; }
+      .today-attendance-card.featured .today-attendance-card-label,
+      .today-attendance-card.featured small { color: #d0d0d0; }
+      .today-attendance-card.featured strong { color: #ffffff; font-size: 42px; }
+      .today-attendance-card-button { position: relative; width: 100%; appearance: none; border: 1px solid var(--line); text-align: left; font: inherit; cursor: pointer; }
+      .today-attendance-card-button .attendance-view-icon { position: absolute; top: 10px; right: 12px; color: var(--muted); font-size: 17px; }
+      .today-attendance-card.featured .attendance-view-icon { color: #fff3d2; }
+      .gathering-attendee-list { display: grid; max-height: min(52dvh, 460px); overflow-y: auto; }
+      .gathering-attendee-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 2px 10px; padding: 8px 2px; border-bottom: 1px solid var(--line); }
+      .gathering-attendee-name { min-width: 0; overflow-wrap: anywhere; font-size: 11px; font-weight: 700; }
+      .gathering-attendee-meta { color: var(--muted); font-size: 9px; overflow-wrap: anywhere; }
+      .gathering-attendee-row .badge { grid-column: 2; grid-row: 1 / span 2; justify-self: end; }
+      .gathering-attendee-empty { padding: 16px 2px; color: var(--muted); font-size: 11px; }
+    .stat-card { position: relative; min-width: 0; padding: 15px 16px 13px; background: var(--surface); border: 1px solid var(--line); border-radius: 7px; box-shadow: var(--shadow); }
+    .stat-card::before { position: absolute; top: 0; left: 15px; width: 27px; height: 2px; content: ""; background: var(--accent, var(--primary)); }
+    .stat-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: var(--muted); font-size: 10px; font-weight: 650; }
+    .stat-icon { display: grid; place-items: center; width: 28px; height: 28px; color: var(--accent, var(--primary)); background: color-mix(in srgb, var(--accent, var(--primary)) 11%, transparent); border-radius: 6px; }
+    .stat-icon .material-symbols-rounded { font-size: 16px; }
+    .stat-value { margin-top: 9px; color: var(--ink); font: 800 25px "Manrope", sans-serif; font-variant-numeric: tabular-nums; }
+    .stat-foot { display: flex; align-items: center; gap: 5px; margin-top: 4px; color: var(--muted); font-size: 9px; }
+    .trend-positive { color: #09835d; font-weight: 700; }
+    .trend-negative { color: var(--danger); font-weight: 700; }
+    .chart-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 13px; margin-bottom: 14px; }
+    .panel { min-width: 0; background: var(--surface); border: 1px solid var(--line); border-radius: 7px; box-shadow: var(--shadow); }
+    .panel-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 14px 16px 0; }
+    .panel-head h3 { margin: 0; font: 750 12px "Manrope", sans-serif; }
+    .panel-head p { margin: 3px 0 0; color: var(--muted); font-size: 9px; }
+    .chart-wrap { position: relative; height: 225px; padding: 10px 14px 13px; }
+    .chart-canvas { width: 100% !important; height: 100% !important; }
+    .table-panel { margin-bottom: 14px; }
+    .table-tools { display: flex; align-items: center; flex-wrap: wrap; gap: 7px; }
+    .filter-select { min-height: 33px; padding: 0 25px 0 9px; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 5px; outline: 0; font-size: 10px; }
+    .table-scroll { overflow: auto; }
+    table { width: 100%; border-collapse: collapse; text-align: left; }
+    .statistics-table { min-width: 560px; }
+    .members-table { min-width: 940px; }
+    th { padding: 9px 12px; color: var(--muted); background: color-mix(in srgb, var(--canvas) 76%, var(--surface)); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); font-size: 9px; font-weight: 750; letter-spacing: .04em; text-transform: uppercase; white-space: nowrap; }
+    th button { display: inline-flex; align-items: center; gap: 3px; padding: 0; color: inherit; background: transparent; border: 0; font-size: inherit; font-weight: inherit; letter-spacing: inherit; text-transform: inherit; }
+    th button:hover { color: var(--primary); }
+    th .material-symbols-rounded { font-size: 13px; }
+    td { padding: 9px 12px; color: var(--ink); border-bottom: 1px solid var(--line); font-size: 10px; }
+    tbody tr:nth-child(even) { background: color-mix(in srgb, var(--canvas) 40%, var(--surface)); }
+    tbody tr.member-row { cursor: pointer; }
+    tbody tr.member-row:hover { background: var(--primary-soft); }
+    tbody tr:last-child td { border-bottom: 0; }
+    .member-id-cell { color: var(--primary); font-weight: 700; white-space: nowrap; }
+    .member-name-cell { font-weight: 650; }
+    .badge { display: inline-flex; align-items: center; padding: 3px 6px; border-radius: 99px; font-size: 9px; font-weight: 700; white-space: nowrap; }
+    .badge-green { color: #087650; background: #e6f5ef; }
+    .badge-red { color: #b42318; background: #feeceb; }
+    .badge-amber { color: #9a5b00; background: #fff4da; }
+    .badge-blue { color: #2451b7; background: #eaf0ff; }
+    .detail-row td { padding: 0; background: var(--surface) !important; }
+    .detail-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px 18px; padding: 15px 20px; background: var(--canvas); border-bottom: 1px solid var(--line); }
+    .detail-field span { display: block; color: var(--muted); font-size: 9px; }
+    .detail-field strong { display: block; margin-top: 2px; font-size: 10px; font-weight: 650; overflow-wrap: anywhere; }
+    .pagination { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 13px; border-top: 1px solid var(--line); }
+    .pagination-copy { color: var(--muted); font-size: 10px; }
+    .pagination-actions { display: flex; align-items: center; gap: 5px; }
+    .page-button { min-width: 29px; height: 29px; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 4px; font-size: 10px; }
+    .page-button.active { color: white; background: var(--primary); border-color: var(--primary); }
+    .page-button:disabled { opacity: .4; cursor: not-allowed; }
+    .loading-cover { position: fixed; inset: 0; z-index: 50; display: none; place-items: center; background: #f7f8facf; backdrop-filter: blur(2px); }
+    .loading-cover.show { display: grid; }
+    .loader-box { display: flex; align-items: center; gap: 11px; padding: 15px 18px; background: var(--surface); border: 1px solid var(--line); border-radius: 7px; box-shadow: var(--shadow); color: var(--muted); font-size: 11px; }
+    .spinner { width: 19px; height: 19px; border: 2px solid var(--line); border-top-color: var(--primary); border-radius: 50%; animation: spin .7s linear infinite; }
+    .button-loading-spinner { width: 14px; height: 14px; flex: 0 0 auto; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: spin .7s linear infinite; }
+    button[aria-busy="true"] { cursor: wait; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .toast-stack { position: fixed; top: 82px; right: 22px; z-index: 80; display: grid; gap: 8px; }
+    .toast { display: flex; align-items: center; gap: 8px; max-width: min(380px, calc(100vw - 28px)); padding: 10px 13px; color: white; background: var(--dark); border-radius: 5px; box-shadow: 0 8px 24px #0002; font-size: 11px; animation: toast-in .18s ease-out; }
+    .toast.error { background: #a6322a; }
+    .toast.success { background: #087650; }
+    @keyframes toast-in { from { transform: translateY(-5px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+    .placeholder-page { display: none; min-height: 60vh; place-items: center; text-align: center; }
+    .placeholder-page.show { display: grid; }
+    .placeholder-page .material-symbols-rounded { color: var(--primary); font-size: 38px; }
+    .placeholder-page h2 { margin: 10px 0 4px; font: 800 18px "Manrope", sans-serif; }
+    .placeholder-page p { margin: 0; color: var(--muted); font-size: 11px; }
+    .demographics-page { display: none; }
+    .demographics-page.show { display: block; }
+    .demographic-shell { display: grid; gap: 18px; }
+    .demographic-header {
+      display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 18px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow);
+    }
+    .demographic-header .eyebrow { margin: 0; }
+    .demographic-header h2 { margin: 2px 0 0; font: 800 18px "Manrope", sans-serif; }
+    .header-badges { display: flex; gap: 8px; flex-wrap: wrap; }
+    .mini-badge {
+      display: inline-flex; align-items: center; justify-content: center; min-height: 30px; padding: 0 12px; color: var(--primary); background: transparent; border: 1px solid #bfd4ff; border-radius: 999px; font-size: 10px; font-weight: 700; white-space: nowrap;
+    }
+    .mini-badge.light { color: var(--muted); background: var(--surface); border-color: var(--line); }
+    .demographic-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+    .demographic-card {
+      min-width: 0; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow); overflow: hidden;
+    }
+    .demographic-card-header { display: flex; align-items: center; gap: 10px; padding: 16px 18px 12px; }
+    .demographic-card-icon { display: grid; place-items: center; width: 28px; height: 28px; color: var(--primary); background: var(--primary-soft); border-radius: 8px; font-size: 16px; }
+    .demographic-card-header h3 { margin: 0; font: 800 17px "Manrope", sans-serif; }
+    .demographic-card-header p { margin: 3px 0 0; color: var(--muted); font-size: 10px; }
+    .demographic-card-body { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; padding: 0 18px 18px; }
+    .stat-mini { padding: 12px 10px; background: color-mix(in srgb, var(--canvas) 72%, var(--surface)); border: 1px solid var(--line); border-radius: 8px; }
+    .stat-mini .label { display: block; color: var(--muted); font-size: 9px; text-transform: uppercase; letter-spacing: .04em; }
+    .stat-mini strong { display: block; margin-top: 8px; font: 800 25px "Manrope", sans-serif; }
+    .stat-mini .percent { display: block; margin-top: 4px; color: var(--muted); font-size: 9px; }
+    .report-shell {
+      background: var(--surface); border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow); overflow: hidden;
+    }
+    .report-shell-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 18px; background: #0f172a; color: white; }
+    .report-shell-header h3 { margin: 0; font: 800 14px "Manrope", sans-serif; }
+    .report-shell-header .badge-inline { display: inline-flex; align-items: center; justify-content: center; min-height: 26px; padding: 0 12px; color: white; background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.18); border-radius: 999px; font-size: 9px; font-weight: 700; }
+    .report-table-wrap { overflow: auto; }
+    .report-table { width: 100%; min-width: 840px; border-collapse: collapse; }
+    .report-table th { padding: 12px 10px; color: #dfe8f8; background: rgba(255,255,255,.04); border-bottom: 1px solid rgba(255,255,255,.12); font-size: 9px; letter-spacing: .08em; text-transform: uppercase; }
+    .report-table td { padding: 10px 10px; border-bottom: 1px solid var(--line); color: var(--ink); font-size: 11px; }
+    .report-table tbody tr:nth-child(even) { background: color-mix(in srgb, var(--canvas) 48%, var(--surface)); }
+    .report-table td strong { font-weight: 800; }
+    .report-table .status-good { color: #089c69; font-weight: 700; }
+    .report-table .status-warn { color: #a15e00; font-weight: 700; }
+    .report-table .status-danger { color: #c9243a; font-weight: 700; }
+    .report-table .status-blue { color: #2b63c7; font-weight: 700; }
+    .report-table .status-purple { color: #7b4ec9; font-weight: 700; }
+    .report-table .total-row td { background: rgba(37,99,235,.05); font-weight: 800; }
+    .demographic-signoff { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; padding-top: 8px; }
+    .signoff-box { display: flex; align-items: center; justify-content: space-between; padding-top: 16px; border-top: 1px solid var(--line); }
+    .signoff-box strong { display: block; text-transform: uppercase; font-size: 11px; }
+    .signoff-box span { display: block; margin-top: 8px; color: var(--muted); font-size: 9px; letter-spacing: .08em; }
+    .mobile-overlay { display: none; }
+    .clark-launcher { position: fixed; right: 22px; bottom: 20px; z-index: 20; display: flex; align-items: center; gap: 8px; min-height: 47px; padding: 5px 14px 5px 6px; color: white; background: var(--primary); border: 0; border-radius: 24px; box-shadow: 0 5px 18px #17203330; font-size: 11px; font-weight: 750; }
+    .clark-launcher:hover { background: #1d4ed8; }
+    .clark-avatar { display: grid; place-items: center; width: 34px; height: 34px; color: var(--primary); background: white; border-radius: 50%; }
+    .clark-avatar .material-symbols-rounded { font-size: 20px; }
+    .chat-panel { position: fixed; right: 20px; bottom: 78px; z-index: 39; display: none; flex-direction: column; width: min(400px, calc(100vw - 24px)); height: min(570px, calc(100dvh - 100px)); overflow: hidden; background: var(--surface); border: 1px solid var(--line); border-radius: 9px; box-shadow: 0 16px 45px #1720332b; }
+    .chat-panel.open { display: flex; }
+    .chat-header { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; color: white; background: var(--primary); }
+    .chat-header strong { font-size: 12px; }
+    .chat-header span { display: block; color: #dce7ff; font-size: 9px; }
+    .chat-close { display: grid; place-items: center; width: 29px; height: 29px; color: white; background: transparent; border: 0; }
+    .chat-messages { display: flex; flex: 1; flex-direction: column; gap: 8px; overflow-y: auto; padding: 12px; background: var(--canvas); }
+    .chat-message { max-width: 89%; padding: 8px 10px; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 8px 8px 8px 2px; font-size: 11px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
+    .chat-message.user { align-self: flex-end; color: white; background: var(--primary); border-color: var(--primary); border-radius: 8px 8px 2px 8px; }
+    .change-preview { align-self: stretch; max-width: 100%; padding: 11px; white-space: normal; }
+    .change-title { margin: 0 0 4px; font-size: 12px; font-weight: 750; }
+    .change-intro, .change-status { margin: 0 0 8px; color: var(--muted); font-size: 10px; }
+    .change-list { display: grid; gap: 7px; margin: 0 0 10px; padding: 0; list-style: none; }
+    .change-list li { padding: 7px; background: var(--canvas); border: 1px solid var(--line); border-radius: 5px; }
+    .change-label, .change-values, .change-reason { display: block; overflow-wrap: anywhere; }
+    .change-label { font-size: 10px; font-weight: 700; }
+    .change-values { margin-top: 3px; color: var(--primary); font-size: 10px; font-weight: 700; }
+    .change-reason { margin-top: 3px; color: var(--muted); font-size: 9px; }
+    .change-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+    .change-actions button { min-height: 33px; padding: 0 9px; border: 1px solid var(--line); border-radius: 5px; font-size: 10px; font-weight: 700; }
+    .change-confirm { color: white; background: var(--primary); border-color: var(--primary) !important; }
+    .change-cancel { color: var(--ink); background: var(--surface); }
+    .chat-form { display: flex; gap: 7px; padding: 9px; border-top: 1px solid var(--line); }
+    .chat-input { flex: 1; min-width: 0; min-height: 42px; max-height: 110px; padding: 8px 9px; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 5px; outline: 0; font: inherit; font-size: 11px; resize: vertical; }
+    .chat-send { display: grid; place-items: center; width: 38px; color: white; background: var(--primary); border: 0; border-radius: 5px; }
+    .chat-send:disabled { opacity: .45; cursor: not-allowed; }
+    body.dark-mode { color-scheme: dark; --ink: #e7edf5; --muted: #9caabc; --line: #354153; --surface: #202b3a; --canvas: #161e2a; --primary-soft: #263c64; --shadow: 0 4px 18px #0002; }
+    body.dark-mode .loading-cover { background: #161e2acc; }
+    body.dark-mode .sidebar { background: #111923; }
+    body.dark-mode tbody tr:nth-child(even) { background: #ffffff05; }
+    body.dark-mode .detail-grid { background: #182230; }
+    body.dark-mode .badge-green { color: #6ee7b7; background: #064e3b; }
+    body.dark-mode .badge-red { color: #fca5a5; background: #5a2525; }
+    body.dark-mode .badge-amber { color: #fcd34d; background: #5a4016; }
+    body.dark-mode .badge-blue { color: #b6c8ff; background: #263c64; }
+    .module-view[hidden] { display: none !important; }
+    .module-titlebar { display: flex; align-items: flex-end; justify-content: space-between; gap: 15px; margin: 0 0 15px; }
+    .module-titlebar h2 { margin: 0; font: 800 20px "Manrope", sans-serif; }
+    .module-caption { margin: 4px 0 0; color: var(--muted); font-size: 11px; }
+    .module-panel { min-width: 0; margin-bottom: 14px; overflow: hidden; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; box-shadow: var(--shadow); }
+    .member-actions-row, .member-filter-row, .fast-search-row, .fast-bulk-row { display: flex; align-items: center; gap: 8px; padding: 12px 14px; }
+    .member-actions-row { border-bottom: 1px solid var(--line); }
+    .member-filter-row { flex-wrap: wrap; min-height: 52px; }
+    .module-search { position: relative; display: block; min-width: 180px; flex: 1; }
+    .module-search .material-symbols-rounded { position: absolute; top: 9px; left: 10px; color: #8996a7; font-size: 17px; pointer-events: none; }
+    .module-search input { width: 100%; min-height: 37px; padding: 0 10px 0 34px; color: var(--ink); background: var(--surface); border: 1px solid #cbd5e1; border-radius: 6px; outline: 0; font-size: 11px; }
+    .module-search input:focus, .module-select:focus, .module-dialog input:focus, .module-dialog textarea:focus { border-color: #8eabf7; outline: 2px solid #2563eb20; }
+    .action-buttons { display: flex; align-items: center; gap: 6px; }
+    .module-button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 33px; padding: 0 9px; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 6px; font-size: 10px; font-weight: 650; white-space: nowrap; }
+    .module-button:hover { background: var(--canvas); border-color: #bfccda; }
+    .module-button:disabled { opacity: .5; cursor: not-allowed; }
+    .module-button .material-symbols-rounded { font-size: 16px; }
+    .module-button.primary { color: #fff; background: var(--primary); border-color: var(--primary); }
+    .module-button.primary:hover { background: #1d4ed8; }
+    .count-chip { padding: 1px 5px; color: var(--muted); background: var(--canvas); border-radius: 8px; font-size: 9px; }
+    .filter-label { display: inline-flex; align-items: center; gap: 5px; color: var(--muted); font-size: 10px; }
+    .filter-label .material-symbols-rounded { font-size: 16px; }
+    .module-select { min-height: 32px; max-width: 100%; padding: 0 26px 0 9px; color: var(--ink); background: var(--surface); border: 1px solid #cbd5e1; border-radius: 6px; outline: 0; font-size: 10px; }
+    .committee-select { min-width: 150px; }
+    .filter-count { margin-left: auto; color: var(--muted); font-size: 10px; white-space: nowrap; }
+    .module-table-scroll { width: 100%; overflow: auto; }
+    .module-table { width: 100%; border-collapse: collapse; text-align: left; }
+    .members-directory-table { min-width: 1160px; }
+    .module-table th { padding: 10px 11px; color: #344255; background: #f1f5f9; border-top: 0; border-bottom: 1px solid var(--line); font-size: 9px; font-weight: 750; letter-spacing: .04em; text-transform: uppercase; white-space: normal; }
+    .module-table td { padding: 9px 11px; border-bottom: 1px solid #edf1f5; font-size: 10px; vertical-align: middle; }
+    .module-table tbody tr:nth-child(even) { background: color-mix(in srgb, var(--canvas) 38%, var(--surface)); }
+    .module-table tbody tr:hover { background: var(--primary-soft); }
+    .module-table td small { display: block; margin-top: 2px; color: var(--muted); font-size: 9px; }
+    .module-table .id-cell { color: #101827; font-family: ui-monospace, monospace; font-weight: 650; white-space: nowrap; }
+    .module-table .rate-cell { color: #00966d; font-weight: 750; white-space: nowrap; }
+    .module-badge { display: inline-flex; margin: 1px 2px 1px 0; padding: 3px 6px; color: #38516f; background: #eef2f7; border: 1px solid #e0e7ef; border-radius: 5px; font-size: 9px; line-height: 1.25; white-space: nowrap; }
+    .module-badge.green { color: #087650; background: #e4fbf1; border-color: #a4f1d1; }
+    .module-badge.red { color: #bd2639; background: #fff0f1; border-color: #ffc9cf; }
+    .module-badge.amber { color: #a15e00; background: #fff7e7; border-color: #ffe3a4; }
+    .module-badge.purple { color: #7b25b5; background: #f6edff; border-color: #e7d1ff; }
+    .module-badge.blue { color: #1552bc; background: #e8f1ff; border-color: #bfdbfe; }
+    .row-actions { display: flex; gap: 2px; white-space: nowrap; }
+    .row-icon-button { display: inline-grid; place-items: center; width: 27px; height: 27px; color: #60758f; background: transparent; border: 0; border-radius: 4px; }
+    .row-icon-button:hover { color: var(--primary); background: var(--primary-soft); }
+    .row-icon-button .material-symbols-rounded { font-size: 16px; }
+    .member-view-button { display: inline-grid; place-items: center; width: 32px; height: 32px; color: var(--muted); background: transparent; border: 1px solid transparent; border-radius: 5px; }
+    .member-view-button:hover, .member-view-button:focus-visible { color: var(--primary); background: var(--primary-soft); border-color: var(--line); }
+    .member-view-button .material-symbols-rounded { font-size: 19px; }
+    .module-empty { padding: 23px 12px !important; color: var(--muted); text-align: center; }
+    .module-pagination { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 9px 13px; color: var(--muted); border-top: 1px solid var(--line); font-size: 10px; }
+    #members-page-buttons { display: flex; gap: 5px; }
+    .square-button { width: 34px; padding: 0; }
+    .attendance-selector-grid { display: grid; grid-template-columns: 1.05fr 1fr 1fr; align-items: start; gap: 14px; padding: 17px 18px; }
+    .attendance-selector-grid label { display: grid; gap: 7px; min-width: 0; }
+    .step-label { color: #172b4d; font-size: 10px; font-weight: 750; letter-spacing: .04em; text-transform: uppercase; }
+    .wide-select { width: 100%; min-height: 38px; color: var(--ink); font-size: 11px; }
+    .attendance-selector-grid small { min-height: 14px; color: var(--muted); font-size: 9px; }
+    .attendance-save-actions { display: grid; gap: 7px; padding-top: 24px; }
+    .save-attendance { min-height: 39px; color: white; background: #059669; border-color: #059669; font-size: 11px; }
+    .save-attendance:hover { background: #047857; }
+    .attendance-save-actions .module-button:not(.save-attendance) { color: var(--primary); border-color: #bfdbfe; }
+    .attendee-stats { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; padding: 0 18px 16px; }
+    .attendance-count { display: grid; place-items: center; min-height: 58px; gap: 1px; border: 1px solid; border-radius: 7px; text-transform: uppercase; }
+    .attendance-count span { font-size: 8px; font-weight: 750; }
+    .attendance-count strong { font: 800 17px "Manrope", sans-serif; }
+    .present-count { color: #008658; background: #ecfdf5; border-color: #bbf7d0; }
+    .absent-count { color: #c82438; background: #fff1f2; border-color: #ffe4e6; }
+    .late-count { color: #a15e00; background: #fffbeb; border-color: #fde68a; }
+    .excused-count { color: #087e9a; background: #ecfeff; border-color: #a5f3fc; }
+    .unmarked-count { color: #34465d; background: #f1f5f9; border-color: #dbe4ee; }
+    .fast-search-row { flex-wrap: wrap; }
+    .fast-search-row .module-search { flex: 1 1 280px; }
+    .fast-bulk-row { justify-content: space-between; flex-wrap: wrap; padding-top: 0; }
+    .fast-bulk-row > div { display: flex; flex-wrap: wrap; gap: 6px; }
+    .success-outline { color: #008658; background: #f3fff9; border-color: #9aefc9; }
+    .danger-outline { color: #b42336; background: #fff6f6; border-color: #ffc5cb; }
+    .attendee-row { display: flex; align-items: center; gap: 11px; padding: 11px 13px; border-top: 1px solid var(--line); }
+    .attendee-avatar { display: grid; place-items: center; width: 39px; height: 39px; flex: 0 0 auto; color: var(--primary); background: #eef4fb; border: 1px solid #dce6f0; border-radius: 50%; font-size: 11px; font-weight: 700; }
+    .attendee-info { min-width: 0; flex: 1; }
+    .attendee-info > strong { display: block; color: var(--ink); font-size: 11px; }
+    .attendee-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 7px; margin-top: 2px; color: var(--muted); font-size: 9px; }
+    .attendee-meta-id { padding: 1px 4px; color: #426084; background: #f1f5f9; border: 1px solid #dce5ef; border-radius: 3px; font-family: ui-monospace, monospace; }
+    .attendee-meta-category, .attendee-meta-status { padding: 1px 5px; color: #2860b8; background: #eaf2ff; border-radius: 4px; }
+    .attendee-meta-status { color: #0b875d; background: #e7fbf1; }
+    .attendee-meta-committee { color: var(--primary); }
+    .attendee-rate { color: #008e69; font-weight: 700; }
+    .attendance-status-buttons { display: flex; gap: 5px; }
+    .status-choice { display: inline-flex; align-items: center; gap: 4px; min-height: 29px; padding: 0 8px; color: #35475e; background: #f1f5f9; border: 1px solid transparent; border-radius: 5px; font-size: 9px; font-weight: 700; }
+    .status-choice .material-symbols-rounded { font-size: 14px; }
+    .status-choice:hover, .status-choice.selected { color: var(--primary); background: #eaf1ff; border-color: #bfd2ff; }
+    .schedule-titlebar { align-items: center; }
+    .schedule-week-controls { display: flex; gap: 6px; }
+    .weekly-event-list { display: grid; gap: 14px; }
+    .event-card { overflow: hidden; }
+    .event-card-head { display: flex; align-items: center; justify-content: space-between; gap: 15px; padding: 15px 17px; border-bottom: 1px solid var(--line); }
+    .event-summary { min-width: 0; }
+    .event-summary > strong { display: inline-block; margin-right: 8px; font: 750 13px "Manrope", sans-serif; }
+    .event-badges { display: inline-flex; flex-wrap: wrap; gap: 4px; vertical-align: middle; }
+    .event-summary p { margin: 5px 0 0; color: var(--muted); font-size: 10px; }
+    .event-schedules-body { padding: 15px 17px 17px; }
+    .event-schedules-body h3 { margin: 0 0 11px; color: var(--ink); font-size: 10px; font-weight: 750; letter-spacing: .04em; text-transform: uppercase; }
+    .schedule-card-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+    .schedule-card { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 5px 8px; min-width: 0; padding: 11px; background: color-mix(in srgb, var(--canvas) 55%, var(--surface)); border: 1px solid var(--line); border-radius: 6px; }
+    .schedule-card > strong { overflow: hidden; color: var(--ink); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+    .schedule-card .schedule-id { color: #8190a3; font: 8px ui-monospace, monospace; text-align: right; }
+    .schedule-card > span:not(.schedule-id) { display: flex; grid-column: 1 / -1; align-items: center; gap: 5px; color: var(--muted); font-size: 9px; }
+    .schedule-card > span .material-symbols-rounded { font-size: 13px; }
+    .schedule-card-actions { display: flex; grid-column: 1 / -1; gap: 12px; }
+    .schedule-attendance-link { display: inline-flex; grid-column: 1 / -1; align-items: center; gap: 5px; margin-top: 4px; padding: 7px 0 0; color: var(--primary); background: transparent; border: 0; border-top: 1px solid var(--line); text-align: left; font-size: 9px; font-weight: 700; }
+    .schedule-attendance-link .material-symbols-rounded { font-size: 14px; }
+    .module-dialog { width: min(620px, calc(100vw - 24px)); max-height: min(82vh, 760px); padding: 19px; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 9px; box-shadow: 0 24px 80px #11182735; }
+    .module-dialog::backdrop { background: #11182775; backdrop-filter: blur(2px); }
+    .module-dialog form { display: grid; gap: 14px; }
+    .dialog-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding-bottom: 11px; border-bottom: 1px solid var(--line); }
+    .dialog-heading h2 { margin: 0; font: 800 17px "Manrope", sans-serif; }
+    .form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 11px; }
+    .module-dialog label { display: grid; gap: 5px; color: var(--muted); font-size: 10px; font-weight: 650; }
+    .module-dialog input, .module-dialog select, .module-dialog textarea { width: 100%; min-height: 35px; padding: 7px 9px; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 5px; outline: 0; font-size: 11px; }
+    .module-dialog textarea { resize: vertical; }
+    .form-wide { grid-column: 1 / -1; }
+    .module-help { margin: -4px 0 0; color: var(--muted); font-size: 9px; }
+    .dialog-actions { display: flex; justify-content: flex-end; gap: 7px; padding-top: 11px; border-top: 1px solid var(--line); }
+    #member-trash-dialog { width: min(550px, calc(100vw - 24px)); }
+    @media print {
+      :root { color-scheme: light; --ink: #111; --muted: #555; --line: #ccc; --surface: #fff; --canvas: #fff; }
+      body { background: white; font-size: 10px; }
+      .sidebar, .topbar, .heading-tools, .table-tools, .pagination, .clark-launcher, .chat-panel, .toast-stack, .loading-cover, .mobile-toggle { display: none !important; }
+      .workspace { margin: 0; }
+      .main-content { max-width: none; padding: 10px; }
+      .stat-card, .panel { box-shadow: none; break-inside: avoid; }
+      .chart-grid { grid-template-columns: repeat(2, 1fr); }
+      .members-table { min-width: 0; }
+      .table-scroll { overflow: visible; }
+    }
+    @media (max-width: 1180px) {
+      .sidebar { width: 220px; }
+      .workspace { margin-left: 220px; }
+      .topbar { padding: 0 18px; }
+      .main-content { padding-right: 18px; padding-left: 18px; }
+      .top-actions { gap: 5px; }
+      .search-control { width: 155px; }
+    }
+    @media (max-width: 900px) {
+      .sidebar { transform: translateX(-100%); transition: transform .2s ease; }
+      .sidebar.open { transform: translateX(0); }
+      .workspace { margin-left: 0; }
+      .mobile-toggle { display: inline-grid; }
+      .mobile-overlay.show { position: fixed; inset: 0; z-index: 25; display: block; background: #11182770; }
+      .topbar { min-height: 62px; }
+      .date-control input { width: 112px; }
+      .live-context { flex-basis: 175px; }
+    }
+    @media (max-width: 700px) {
+      .topbar { align-items: flex-start; flex-wrap: wrap; padding: 10px 13px; }
+      .top-left { flex: 1; }
+      .live-context { order: 2; flex: 1 1 100%; margin: 0 0 2px 43px; }
+      .live-gathering-detail { display: none; }
+      h1 { font-size: 16px; }
+      .top-subtitle { display: none; }
+      .top-actions { width: 100%; flex-wrap: wrap; }
+      .date-control { flex: 1; }
+      .date-control input { width: 100%; min-width: 0; }
+      .search-control { flex: 1 1 100%; width: auto; order: 3; }
+      .main-content { padding: 16px 12px 38px; }
+      .content-heading { align-items: flex-start; flex-direction: column; }
+      .content-heading h2 { font-size: 18px; }
+      .heading-tools { flex-wrap: wrap; }
+      .stats-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+      .stat-card { padding: 12px; }
+      .stat-value { font-size: 22px; }
+      .chart-grid { grid-template-columns: 1fr; gap: 9px; }
+      .chart-wrap { height: 210px; }
+      .panel-head { padding: 12px 12px 0; }
+      .panel-head h3 { font-size: 11px; }
+      .table-tools { width: 100%; }
+      .filter-select { flex: 1; min-width: 0; }
+      .detail-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 12px; }
+      .pagination { align-items: flex-start; flex-direction: column; }
+      .pagination-actions { max-width: 100%; overflow-x: auto; }
+      .clark-launcher { right: 12px; bottom: 12px; }
+      .chat-panel { right: 10px; bottom: 68px; width: calc(100vw - 20px); height: min(600px, calc(100dvh - 80px)); }
+      .member-actions-row, .fast-search-row { align-items: stretch; flex-direction: column; }
+      .action-buttons { flex-wrap: wrap; }
+      .attendance-selector-grid { grid-template-columns: 1fr; gap: 8px; padding: 13px; }
+      .attendance-save-actions { grid-template-columns: 1fr 1fr; padding-top: 0; }
+      .attendee-stats { grid-template-columns: repeat(5, minmax(55px, 1fr)); gap: 5px; padding: 0 10px 12px; }
+      .attendance-count { min-height: 49px; }
+      .attendance-count span { font-size: 7px; }
+      .attendee-row { align-items: flex-start; flex-wrap: wrap; }
+      .attendee-info { width: calc(100% - 54px); flex: 1 1 calc(100% - 54px); }
+      .attendance-status-buttons { width: 100%; display: grid; grid-template-columns: repeat(4, 1fr); padding-left: 49px; }
+      .status-choice { justify-content: center; padding: 0 4px; font-size: 8px; }
+      .schedule-titlebar { align-items: flex-start; flex-direction: column; }
+      .event-card-head { align-items: flex-start; flex-direction: column; }
+      .schedule-card-grid { grid-template-columns: 1fr; }
+      .form-grid { grid-template-columns: 1fr; }
+      .form-wide { grid-column: auto; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <aside id="sidebar" class="sidebar" aria-label="Primary navigation">
+      <div class="brand">
+        <div class="brand-icon"><span class="material-symbols-rounded" aria-hidden="true">groups</span></div>
+        <div class="brand-copy"><strong>ASCO VILLE</strong><span>Membership Office</span></div>
+      </div>
+      <div class="nav-label">Workspace</div>
+      <nav aria-label="Dashboard pages"><ul class="nav-list">
+        <li><button class="nav-link active" data-page="Dashboard" aria-current="page"><span class="material-symbols-rounded">space_dashboard</span>Dashboard</button></li>
+        <li><button class="nav-link" data-page="Members"><span class="material-symbols-rounded">group</span>Members</button></li>
+        <li><button class="nav-link" data-page="Fast Attendance"><span class="material-symbols-rounded">how_to_reg</span>Fast Attendance</button></li>
+        <li><button class="nav-link" data-page="Weekly Schedule"><span class="material-symbols-rounded">event_repeat</span>Weekly Schedule</button></li>
+        <li><button class="nav-link" data-page="Special Events"><span class="material-symbols-rounded">event</span>Special Events</button></li>
+        <li><button class="nav-link" data-page="Event History"><span class="material-symbols-rounded">history</span>Event History</button></li>
+        <li><button class="nav-link" data-page="Demographics"><span class="material-symbols-rounded">bar_chart</span>Demographics</button></li>
+        <li><button class="nav-link" data-page="Statistics"><span class="material-symbols-rounded">query_stats</span>Statistics</button></li>
+        <li><button class="nav-link" data-page="Reports"><span class="material-symbols-rounded">description</span>Reports</button></li>
+        <li><button class="nav-link" data-page="Settings"><span class="material-symbols-rounded">settings</span>Settings</button></li>
+      </ul></nav>
+      <div class="sidebar-spacer"></div>
+      <div class="sidebar-profile">
+        <div id="sidebar-avatar" class="profile-avatar">SA</div>
+        <div class="profile-copy"><strong id="sidebar-user">Secretary / Admin</strong><span>Administrator</span></div>
+        <button id="theme-toggle" class="profile-menu" type="button" title="Toggle dark mode" aria-label="Toggle dark mode"><span id="theme-icon" class="material-symbols-rounded">dark_mode</span></button>
+      </div>
+    </aside>
+    <div id="mobile-overlay" class="mobile-overlay"></div>
+
+    <div class="workspace">
+      <header class="topbar">
+        <div class="top-left">
+          <button id="mobile-toggle" class="icon-button mobile-toggle" type="button" aria-label="Open navigation"><span class="material-symbols-rounded">menu</span></button>
+          <div><h1 id="page-title">Members Statistics</h1><p id="header-subtitle" class="top-subtitle">Membership and attendance overview</p></div>
+        </div>
+        <div class="live-context" aria-label="Live date, time, and gathering">
+          <time id="live-clock" class="live-clock"></time>
+          <strong id="live-gathering-title" class="live-gathering-title">Loading gathering schedule...</strong>
+          <span id="live-gathering-detail" class="live-gathering-detail"></span>
+        </div>
+        <div id="top-actions" class="top-actions">
+          <label class="date-control"><span>From</span><input id="date-from" type="date" aria-label="From date"></label>
+          <label class="date-control"><span>To</span><input id="date-to" type="date" aria-label="To date"></label>
+          <button id="apply-range" class="primary-button" type="button"><span class="material-symbols-rounded">filter_alt</span>Apply</button>
+          <label class="search-control"><span class="material-symbols-rounded">search</span><input id="global-search" type="search" placeholder="Search ID, name, or status" aria-label="Search members"></label>
+          <button id="refresh-button" class="icon-button" type="button" title="Refresh live data" aria-label="Refresh live data"><span class="material-symbols-rounded">refresh</span></button>
+          <button id="profile-button" class="icon-button" type="button" title="Account profile" aria-label="Account profile"><span class="material-symbols-rounded">account_circle</span></button>
+        </div>
+      </header>
+
+      <main class="main-content">
+        <div id="statistics-page">
+          <section class="content-heading">
+            <div><p class="eyebrow">Secretary overview</p><h2>Members Statistics</h2><p id="period-label">Loading selected date range...</p></div>
+            <div class="heading-tools">
+              <button id="export-button" class="secondary-button" type="button"><span class="material-symbols-rounded">download</span>Export CSV</button>
+              <button id="print-button" class="secondary-button" type="button"><span class="material-symbols-rounded">print</span>Print</button>
+            </div>
+          </section>
+
+          <section class="today-attendance-cards" aria-label="Selected gathering attendance summary">
+            <button id="today-present-card" class="today-attendance-card today-attendance-card-button featured" type="button" aria-haspopup="dialog" aria-label="View present members"><span id="today-present-label" class="today-attendance-card-label">Present in gathering</span><strong id="today-present-count">—</strong><small id="today-present-detail"></small><span class="material-symbols-rounded attendance-view-icon" aria-hidden="true">visibility</span></button>
+            <button id="today-unmarked-card" class="today-attendance-card today-attendance-card-button" type="button" aria-haspopup="dialog" aria-label="View unmarked members"><span id="today-unmarked-label" class="today-attendance-card-label">Unmarked</span><strong id="today-unmarked-count">—</strong><small id="today-unmarked-detail"></small><span class="material-symbols-rounded attendance-view-icon" aria-hidden="true">visibility</span></button>
+            <button id="today-late-card" class="today-attendance-card today-attendance-card-button" type="button" aria-haspopup="dialog" aria-label="View members marked late"><span id="today-late-label" class="today-attendance-card-label">Late</span><strong id="today-late-count">—</strong><small id="today-late-detail"></small><span class="material-symbols-rounded attendance-view-icon" aria-hidden="true">visibility</span></button>
+            <button id="today-absent-card" class="today-attendance-card today-attendance-card-button" type="button" aria-haspopup="dialog" aria-label="View members marked absent"><span id="today-absent-label" class="today-attendance-card-label">Absent</span><strong id="today-absent-count">—</strong><small id="today-absent-detail"></small><span class="material-symbols-rounded attendance-view-icon" aria-hidden="true">visibility</span></button>
+          </section>
+          <dialog id="gathering-attendees-dialog" class="module-dialog" aria-labelledby="gathering-attendees-title">
+            <div class="dialog-heading"><div><p class="eyebrow">All schedule batches</p><h2 id="gathering-attendees-title">Gathering attendance</h2></div><button class="icon-button" type="button" data-close-dialog="gathering-attendees-dialog" aria-label="Close attendee list"><span class="material-symbols-rounded">close</span></button></div>
+            <p id="gathering-attendees-summary" class="module-help"></p>
+            <div id="gathering-attendees-list" class="gathering-attendee-list"></div>
+          </dialog>
+          <section class="stats-cards" aria-label="Key statistics">
+            <article class="stat-card" style="--accent:var(--primary)"><div class="stat-top"><span>Total members</span><span class="stat-icon"><span class="material-symbols-rounded">groups</span></span></div><div id="total-members" class="stat-value">—</div><div class="stat-foot"><span id="member-change" class="trend-positive">—</span><span>new registrations vs prior period</span></div></article>
+            <article class="stat-card" style="--accent:var(--secondary)"><div class="stat-top"><span>Active members</span><span class="stat-icon"><span class="material-symbols-rounded">verified_user</span></span></div><div id="active-members" class="stat-value">—</div><div id="active-share" class="stat-foot">— of total members</div></article>
+            <article class="stat-card" style="--accent:#397b93"><div class="stat-top"><span>Average attendance</span><span class="stat-icon"><span class="material-symbols-rounded">event_available</span></span></div><div id="average-attendance" class="stat-value">—</div><div id="attendance-detail" class="stat-foot">Across events in selected range</div></article>
+            <article class="stat-card" style="--accent:var(--danger)"><div class="stat-top"><span>At risk members</span><span class="stat-icon"><span class="material-symbols-rounded">warning</span></span></div><div id="at-risk-members" class="stat-value">—</div><div class="stat-foot"><span id="risk-share">Below 50% attendance</span></div></article>
+          </section>
+
+          <section class="chart-grid" aria-label="Membership charts">
+            <article class="panel"><div class="panel-head"><div><h3>Members by Status</h3><p>Current roster composition</p></div></div><div class="chart-wrap"><canvas id="status-chart" class="chart-canvas" aria-label="Members by membership status"></canvas></div></article>
+            <article class="panel"><div class="panel-head"><div><h3>Members by Category</h3><p>Junior and senior members</p></div></div><div class="chart-wrap"><canvas id="category-chart" class="chart-canvas" aria-label="Members by category"></canvas></div></article>
+            <article class="panel"><div class="panel-head"><div><h3>Members by Activity Status</h3><p>Based on attendance in the selected period</p></div></div><div class="chart-wrap"><canvas id="activity-chart" class="chart-canvas" aria-label="Members by activity status"></canvas></div></article>
+            <article class="panel"><div class="panel-head"><div><h3>Attendance Trend</h3><p>Participation rate by month · last 12 months</p></div></div><div class="chart-wrap"><canvas id="trend-chart" class="chart-canvas" aria-label="Attendance trend for the last 12 months"></canvas></div></article>
+          </section>
+
+          <section class="panel table-panel">
+            <div class="panel-head"><div><h3>Detailed Statistics</h3><p>Demographic trends compare new registrations; activity trends compare attendance periods</p></div><button id="toggle-statistics" class="icon-button" type="button" aria-expanded="true" title="Expand or collapse detailed statistics"><span id="statistics-toggle-icon" class="material-symbols-rounded">expand_less</span></button></div>
+            <div id="statistics-content" class="table-scroll statistics-table-scroll"><table class="statistics-table"><thead><tr><th>Metric</th><th>Count</th><th>Percentage</th><th>Trend</th><th aria-label="View statistic details"></th></tr></thead><tbody id="statistics-rows"><tr><td colspan="5">Loading statistics...</td></tr></tbody></table></div>
+          </section>
+
+          <section class="panel table-panel">
+            <div class="panel-head">
+              <div><h3>Members List</h3><p id="members-count-label">Loading members...</p></div>
+              <div class="table-tools">
+                <select id="status-filter" class="filter-select" aria-label="Filter membership status"><option value="">All statuses</option><option>Active</option><option>Inactive</option><option>On &amp; Off</option></select>
+                <select id="category-filter" class="filter-select" aria-label="Filter member category"><option value="">All categories</option><option>Junior</option><option>Senior</option></select>
+                <select id="activity-filter" class="filter-select" aria-label="Filter activity status"><option value="">All activity</option><option>Regular</option><option>Active</option><option>At Risk</option></select>
+              </div>
+            </div>
+            <div class="table-scroll members-list-scroll"><table class="members-table"><thead><tr>
+              <th><button data-sort="memberId">Member ID <span class="material-symbols-rounded">unfold_more</span></button></th>
+              <th><button data-sort="name">Name <span class="material-symbols-rounded">unfold_more</span></button></th>
+              <th><button data-sort="membershipStatus">Status <span class="material-symbols-rounded">unfold_more</span></button></th>
+              <th><button data-sort="category">Category <span class="material-symbols-rounded">unfold_more</span></button></th>
+              <th><button data-sort="activityStatus">Activity Status <span class="material-symbols-rounded">unfold_more</span></button></th>
+              <th><button data-sort="lastAttendanceDate">Last Attendance <span class="material-symbols-rounded">unfold_more</span></button></th>
+              <th><button data-sort="attendancePercent">Attendance % <span class="material-symbols-rounded">unfold_more</span></button></th>
+              <th aria-label="View member details"></th>
+            </tr></thead><tbody id="member-rows"><tr><td colspan="8">Loading member records...</td></tr></tbody></table></div>
+            <div class="pagination"><span id="pagination-copy" class="pagination-copy"></span><div id="pagination-actions" class="pagination-actions"></div></div>
+          </section>
+        </div>
+
+        <?!= include('Members'); ?>
+        <?!= include('FastAttendance'); ?>
+        <?!= include('WeeklySchedule'); ?>
+        <?!= include('SpecialEvents'); ?>
+        <?!= include('EventHistory'); ?>
+        <?!= include('Demographics'); ?>
+        <?!= include('Statistics'); ?>
+        <?!= include('Reports'); ?>
+        <style id="monochrome-responsive-theme">
+          :root {
+            color-scheme: light;
+            --primary: #111111;
+            --primary-soft: #ededed;
+            --secondary: #444444;
+            --warning: #555555;
+            --danger: #111111;
+            --dark: #111111;
+            --ink: #171717;
+            --muted: #666666;
+            --line: #dedede;
+            --surface: #ffffff;
+            --canvas: #f6f6f6;
+            --sidebar: #111111;
+            --shadow: none;
+          }
+          body { color: var(--ink); background: var(--canvas); }
+          body.dark-mode {
+            color-scheme: dark;
+            --ink: #f2f2f2;
+            --muted: #b5b5b5;
+            --line: #3c3c3c;
+            --surface: #171717;
+            --canvas: #0b0b0b;
+            --sidebar: #000000;
+            --primary-soft: #292929;
+            --shadow: none;
+          }
+          .sidebar { color: #f5f5f5; background: #111111; border-right: 1px solid #303030; }
+          .brand-icon { color: #111111; background: #ffffff; border-radius: 4px; }
+          .nav-link.active { color: #111111; background: #ffffff; }
+          .nav-link.active .material-symbols-rounded { color: #111111; }
+          .profile-avatar { color: #111111; background: #e5e5e5; }
+          .workspace, .topbar, .main-content { min-width: 0; }
+          .topbar { background: var(--surface); border-color: var(--line); }
+          .live-context { border-left: 1px solid var(--line); padding-left: 12px; }
+          .primary-button, .module-button.primary, .chat-header, .clark-launcher,
+          .chat-message.user, .change-confirm { color: #ffffff; background: #111111; border-color: #111111; }
+          .primary-button:hover, .module-button.primary:hover, .clark-launcher:hover { background: #333333; }
+          .clark-avatar { color: #111111; background: #ffffff; }
+          .chat-header span { color: #d0d0d0; }
+          .module-button, .secondary-button, .icon-button, .schedule-attendance-link,
+          .status-choice, .success-outline, .danger-outline, .attendance-save-actions .module-button:not(.save-attendance) {
+            color: var(--ink);
+            background: var(--surface);
+            border-color: var(--line);
+          }
+          .module-button:hover, .secondary-button:hover, .icon-button:hover { background: var(--primary-soft); border-color: #999999; }
+          .search-control input, .date-control input, .module-search input, .module-select,
+          .filter-select, .module-dialog input, .module-dialog select, .module-dialog textarea,
+          .chat-input { color: var(--ink); background: var(--surface); border-color: var(--line); }
+          input:focus, select:focus, textarea:focus, button:focus-visible {
+            outline-color: #555555 !important;
+            border-color: #555555 !important;
+          }
+          .eyebrow, .member-id-cell, .attendee-meta-committee, .change-values,
+          .row-icon-button:hover, .status-choice:hover, .status-choice.selected { color: var(--ink); }
+          .status-choice:hover, .status-choice.selected { background: #e7e7e7; border-color: #777777; }
+          .stat-card, .panel, .module-panel, .report-shell, .demographic-card,
+          .demographic-card .demographic-card-body .stat-mini, .schedule-card,
+          .chat-panel, .module-dialog, .loader-box, .reports-toolbar, .report-tabs,
+          .report-panel, .official-template-shell, .statistics-report-shell, .demographic-header {
+            box-shadow: none;
+            border-radius: 4px;
+          }
+          .module-panel, .panel, .stat-card, .report-shell, .demographic-card { border-color: var(--line); }
+          .stat-card::before { background: #111111; }
+          .today-attendance-card { box-shadow: none; border-radius: 4px; }
+          .today-attendance-card.featured { color: #ffffff; background: #111111; border-color: #111111; }
+          .today-attendance-card.featured .today-attendance-card-label,
+          .today-attendance-card.featured small { color: #d0d0d0; }
+          .today-attendance-card.featured strong { color: #ffffff; }
+          .stat-icon, .demographic-card-icon { color: #111111; background: #eeeeee; }
+          .badge, .module-badge, .mini-badge, .count-chip, .attendee-meta-category,
+          .attendee-meta-status, .attendee-meta-id, .event-badges .badge,
+          .report-shell-header .badge-inline, .report-panel-header .badge-inline,
+          .official-report-header .badge-inline {
+            color: #222222;
+            background: #eeeeee;
+            border-color: #d5d5d5;
+          }
+          .badge-green, .badge-red, .badge-amber, .badge-blue,
+          .module-badge.green, .module-badge.red, .module-badge.amber,
+          .module-badge.purple, .module-badge.blue,
+          .attendance-badge.good, .attendance-badge.warn, .attendance-badge.danger,
+          .report-table .status-good, .report-table .status-warn,
+          .report-table .status-danger, .report-table .status-blue,
+          .report-table .status-purple, .status-good, .status-warn, .status-danger,
+          .status-blue, .status-purple, .trend-positive, .trend-negative,
+          .module-table .rate-cell { color: #222222; }
+          .badge-green, .module-badge.green, .attendance-badge.good { background: #e8e8e8; }
+          .badge-red, .module-badge.red, .attendance-badge.danger { background: #dcdcdc; }
+          .badge-amber, .module-badge.amber, .attendance-badge.warn { background: #eeeeee; }
+          .badge-blue, .module-badge.blue, .module-badge.purple { background: #e5e5e5; }
+          .present-count, .absent-count, .late-count, .excused-count, .unmarked-count,
+          .success-outline, .danger-outline { color: #222222; background: #f0f0f0; border-color: #d5d5d5; }
+          .present-count { background: #f7f7f7; }
+          .absent-count { background: #e7e7e7; }
+          .late-count { background: #eeeeee; }
+          .excused-count { background: #f2f2f2; }
+          .unmarked-count { background: #e3e3e3; }
+          .attendee-avatar { color: #222222; background: #ededed; border-color: #d8d8d8; }
+          .attendee-meta-id { color: #333333; background: #f1f1f1; border-color: #dddddd; }
+          .attendee-meta-category, .attendee-meta-status { color: #222222; background: #eeeeee; }
+          .attendance-status-buttons .status-choice { color: #333333; background: #f0f0f0; border-color: #dedede; }
+          .attendance-status-buttons .status-choice.selected { color: #ffffff; background: #111111; border-color: #111111; }
+          .report-shell-header, .report-panel-header, .official-report-header,
+          .statistics-report-header, .official-sheet-top .cell.black { color: #ffffff; background: #111111; }
+          .reports-btn { color: var(--ink); background: var(--surface); border-color: var(--line); border-radius: 4px; }
+          .reports-btn.primary { color: #ffffff; background: #111111; border-color: #111111; }
+          .tab-pill.active { color: #111111; background: #ededed; border-color: #bdbdbd; }
+          .legend-success, .legend-warning, .legend-danger, .legend-purple, .legend-blue {
+            color: #222222;
+            background: #e5e5e5;
+          }
+          .official-sheet-top .cell.header, .official-sheet-top .cell.black,
+          .official-template-table thead th { color: #ffffff; background: #111111; }
+          .official-sheet-top .cell.muted, .official-sheet-top .cell.red,
+          .official-sheet-top .cell.gold, .official-sheet-top .cell.blue,
+          .official-sheet-top .cell.green, .official-sheet-top .cell.primary,
+          .official-sheet-top .cell.light-blue, .official-sheet-top .cell.purple,
+          .official-sheet-top .cell.orange, .official-sheet-top .cell.darkblue {
+            color: #222222;
+            background: #e7e7e7;
+            border-color: #cccccc;
+          }
+          .official-template-table thead .top-title { color: #ffffff; background: #222222; }
+          .official-template-table tbody td { color: #222222; background: #ffffff; }
+          .official-template-table tbody tr:nth-child(odd) td { background: #f0f0f0; }
+          .report-table th, .statistics-report-table th, .official-sheet-top .cell,
+          .official-sheet-top .cell.muted, .official-sheet-top .cell.red,
+          .official-sheet-top .cell.gold, .official-sheet-top .cell.blue,
+          .official-sheet-top .cell.green { color: #222222; background: #eeeeee; border-color: #d4d4d4; }
+          .report-shell-header .badge-inline, .report-table th, .statistics-report-header .badge-inline { color: #f5f5f5; }
+          .report-table .total-row td, .official-summary-table .total-row td { background: #e7e7e7; }
+          .statistics-total-row td { background: #e7e7e7; }
+          .demographic-card-icon { filter: grayscale(1); }
+          .special-event-list { display: grid; gap: 10px; }
+          .special-event-card { padding: 0; }
+          .special-event-card-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 16px; border-bottom: 1px solid var(--line); }
+          .special-event-card-header h3, .event-history-detail-heading h3 { margin: 0; font-size: 14px; }
+          .special-event-card-header p, .event-history-detail-heading p { margin: 4px 0 0; color: var(--muted); font-size: 10px; }
+          .special-event-card-body { display: grid; gap: 8px; padding: 14px 16px; }
+          .special-event-card-body h4, .event-history-detail h4 { margin: 8px 0 0; font-size: 10px; text-transform: uppercase; }
+          .special-event-description { margin: 0; color: var(--muted); font-size: 11px; }
+          .special-event-program { max-height: 280px; overflow: auto; margin: 0; padding: 10px; color: var(--ink); background: var(--canvas); border: 1px solid var(--line); border-radius: 3px; font: 11px/1.6 "DM Sans", sans-serif; white-space: pre-wrap; overflow-wrap: anywhere; }
+          .weekly-event-program, .attendance-event-program { margin-top: 7px; color: var(--ink); font-size: 10px; }
+          .weekly-event-program summary, .attendance-event-program summary { cursor: pointer; color: var(--ink); font-weight: 700; }
+          .weekly-event-program pre, .attendance-event-program pre { max-height: 240px; overflow: auto; margin: 7px 0 0; padding: 9px; color: var(--ink); background: var(--canvas); border: 1px solid var(--line); font: 10px/1.5 "DM Sans", sans-serif; white-space: pre-wrap; overflow-wrap: anywhere; }
+          .special-event-actions { display: flex; flex-wrap: wrap; gap: 7px; padding-top: 4px; }
+          .event-history-layout { display: grid; grid-template-columns: minmax(220px, 300px) minmax(0, 1fr); align-items: start; gap: 12px; }
+          .event-history-list-panel { overflow: hidden; }
+          .event-history-list-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 12px 14px; border-bottom: 1px solid var(--line); }
+          .event-history-list-heading h3 { margin: 0; font-size: 11px; text-transform: uppercase; }
+          .event-history-list { display: grid; max-height: 72vh; overflow: auto; }
+          .event-history-item { display: grid; gap: 3px; width: 100%; padding: 11px 13px; color: var(--ink); background: var(--surface); border: 0; border-bottom: 1px solid var(--line); text-align: left; }
+          .event-history-item:hover, .event-history-item.selected { background: var(--primary-soft); }
+          .event-history-item strong { font-size: 11px; }
+          .event-history-item span, .event-history-item small { color: var(--muted); font-size: 9px; }
+          .event-history-detail { display: grid; gap: 12px; min-width: 0; padding: 15px; }
+          .event-history-detail-heading { padding-bottom: 10px; border-bottom: 1px solid var(--line); }
+          .event-history-summary { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
+          .event-history-metric { display: grid; gap: 3px; min-width: 0; padding: 8px; background: var(--canvas); border: 1px solid var(--line); }
+          .event-history-metric span { color: var(--muted); font-size: 8px; }
+          .event-history-metric strong { font-size: 15px; font-variant-numeric: tabular-nums; }
+          .event-history-assignments { display: grid; gap: 4px; }
+          .event-history-assignments p { margin: 0; font-size: 10px; overflow-wrap: anywhere; }
+          .event-history-description { margin: 0; color: var(--muted); font-size: 10px; }
+          .event-history-table-wrap { max-height: 55vh; border: 1px solid var(--line); }
+          .event-history-table { min-width: 680px; }
+          .event-history-detail .module-help { margin: 0; }
+          .report-table tbody tr:nth-child(even), .statistics-report-table tbody tr:nth-child(even),
+          .module-table tbody tr:nth-child(even), tbody tr:nth-child(even) { background: #f5f5f5; }
+          body.dark-mode .report-table tbody tr:nth-child(even),
+          body.dark-mode .statistics-report-table tbody tr:nth-child(even),
+          body.dark-mode .module-table tbody tr:nth-child(even),
+          body.dark-mode tbody tr:nth-child(even) { background: #222222; }
+          body.dark-mode .module-table th { color: #eeeeee; background: #252525; }
+          body.dark-mode .module-table td { border-color: #333333; }
+          body.dark-mode .detail-grid, body.dark-mode .change-list li { background: #202020; }
+          body.dark-mode .chat-messages { background: #101010; }
+          body.dark-mode .chat-message:not(.user) { background: #1c1c1c; }
+          body.dark-mode .sidebar { background: #000000; border-right-color: #333333; }
+          body.dark-mode .badge-green, body.dark-mode .badge-red,
+          body.dark-mode .badge-amber, body.dark-mode .badge-blue {
+            color: #eeeeee;
+            background: #333333;
+          }
+          body.dark-mode .loading-cover { background: #000000cc; }
+          .toast, .toast.success, .toast.error { color: #ffffff; background: #111111; }
+          .loading-cover { background: #ffffffd9; }
+          .spinner { border-top-color: #111111; }
+          canvas { filter: grayscale(1); }
+          .table-scroll, .module-table-scroll, .report-table-wrap { width: 100%; max-width: 100%; overflow-x: auto; overscroll-behavior-x: contain; }
+          @media (max-width: 1024px) {
+            .stats-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            .today-attendance-cards { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+            .chart-grid, .demographic-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            .attendance-selector-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            .attendance-save-actions { grid-column: 1 / -1; grid-template-columns: repeat(2, minmax(0, 1fr)); padding-top: 0; }
+            .schedule-card-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            .detail-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            .event-history-layout { grid-template-columns: minmax(190px, 240px) minmax(0, 1fr); }
+          }
+          @media (max-width: 900px) {
+            .topbar { flex-wrap: wrap; }
+            .top-left { flex: 1 1 220px; }
+            .live-context { flex: 1 1 190px; margin-left: 0; }
+            .top-actions { flex: 1 1 100%; justify-content: flex-end; flex-wrap: wrap; padding-bottom: 8px; }
+            .main-content { padding-right: 18px; padding-left: 18px; }
+            .fast-search-row { flex-wrap: wrap; }
+            .fast-search-row > * { flex: 1 1 180px; }
+            .fast-bulk-row > div { flex-wrap: wrap; }
+            .attendee-row { flex-wrap: wrap; }
+            .attendance-status-buttons { margin-left: auto; }
+          }
+          @media (max-width: 700px) {
+            .topbar { gap: 8px; padding: 10px 12px; }
+            .top-left { flex: 1 1 100%; }
+            .live-context { flex: 1 1 100%; margin: 0 0 2px 43px; padding-left: 0; border-left: 0; }
+            .top-actions { justify-content: flex-start; gap: 6px; padding-bottom: 0; }
+            .main-content { padding: 14px 10px 34px; }
+            .stats-cards, .chart-grid, .demographic-grid, .schedule-card-grid,
+            .attendance-selector-grid, .form-grid { grid-template-columns: minmax(0, 1fr); }
+            .today-attendance-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
+            .today-attendance-card { min-height: 102px; padding: 10px; }
+            .today-attendance-card strong { font-size: 30px; }
+            .today-attendance-card.featured strong { font-size: 36px; }
+            .attendance-save-actions { grid-column: auto; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            .attendee-stats { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; padding-right: 8px; padding-left: 8px; }
+            .attendance-count { min-width: 0; min-height: 48px; border-radius: 3px; }
+            .attendance-count span { font-size: 7px; }
+            .attendance-count strong { font-size: 14px; }
+            .fast-bulk-row > div { display: grid; width: 100%; grid-template-columns: 1fr; }
+            .fast-bulk-row .module-button { justify-content: flex-start; min-height: 38px; }
+            .attendee-row { align-items: flex-start; }
+            .attendee-info { flex: 1 1 calc(100% - 54px); }
+            .attendance-status-buttons { display: grid; width: 100%; grid-template-columns: repeat(4, minmax(0, 1fr)); margin: 0; padding-left: 49px; }
+            .status-choice { justify-content: center; min-width: 0; padding: 0 3px; font-size: 8px; }
+            .event-card-head, .demographic-header, .report-panel-header { align-items: flex-start; flex-direction: column; }
+            .schedule-week-controls { width: 100%; justify-content: flex-start; }
+            .module-dialog { width: calc(100vw - 20px); max-height: calc(100dvh - 24px); padding: 14px; }
+            .dialog-actions { flex-wrap: wrap; }
+            .chat-panel { right: 8px; bottom: 66px; width: calc(100vw - 16px); height: min(620px, calc(100dvh - 78px)); }
+            .clark-launcher { right: 12px; bottom: 12px; }
+            .demographic-signoff { grid-template-columns: 1fr; }
+            .event-history-layout { grid-template-columns: minmax(0, 1fr); }
+            .event-history-list { max-height: 35vh; }
+            .event-history-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            .special-event-card-header { align-items: flex-start; }
+            .members-list-scroll { overflow-x: hidden; }
+            .members-table, .members-table tbody { display: block; width: 100%; min-width: 0; }
+            .members-table thead { display: none; }
+            .members-table tbody tr.member-row {
+              display: grid;
+              grid-template-columns: max-content minmax(0, 1fr) auto 32px;
+              grid-template-rows: auto;
+              align-items: center;
+              gap: 0 6px;
+              padding: 5px 8px;
+              cursor: default;
+            }
+            .members-table tbody tr.member-row td { min-width: 0; padding: 3px 0; border: 0; white-space: normal; overflow-wrap: anywhere; }
+            .members-table tbody tr.member-row td:nth-child(1) { grid-column: 1; grid-row: 1; white-space: nowrap; }
+            .members-table tbody tr.member-row td:nth-child(2) { grid-column: 2; grid-row: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+            .members-table tbody tr.member-row td:nth-child(3) { grid-column: 3; grid-row: 1; justify-self: end; }
+            .members-table tbody tr.member-row td:nth-child(n+4):nth-child(-n+7) { display: none; }
+            .members-table tbody tr.member-row td:nth-child(8) { grid-column: 4; grid-row: 1; justify-self: end; }
+            .members-table tbody tr:not(.member-row):not(.detail-row) { display: block; }
+            .members-table tbody tr:not(.member-row):not(.detail-row) td { display: block; width: 100%; }
+            .members-table tbody tr.detail-row { display: block; }
+            .members-table tbody tr.detail-row > td { display: block; width: 100%; }
+            .members-table .detail-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; padding: 12px; }
+            .members-table .detail-field { min-width: 0; overflow-wrap: anywhere; }
+            .members-table .detail-field:last-child { grid-column: 1 / -1; }
+          }
+        </style>
+        <style id="metallic-responsive-theme">
+          :root {
+            color-scheme: light;
+            --primary: #9b762f;
+            --primary-soft: #f2ead7;
+            --secondary: #929aa2;
+            --warning: #b8793e;
+            --danger: #8e5141;
+            --dark: #29251e;
+            --ink: #27231d;
+            --muted: #716b60;
+            --line: #ded8cb;
+            --surface: #fffefa;
+            --canvas: #f4f1e9;
+            --sidebar: #211e18;
+            --shadow: 0 3px 12px #3327100a;
+            --metal-gold: #b58b3d;
+            --metal-silver: #a4abb2;
+            --metal-bronze: #a66c3f;
+            --metal-champagne: #d3b76e;
+            --metal-copper: #8b5e3c;
+          }
+          body { color: var(--ink); background: var(--canvas); }
+          body.dark-mode {
+            color-scheme: dark;
+            --primary: #c5a45e;
+            --primary-soft: #393122;
+            --secondary: #b4bbc1;
+            --warning: #c48a55;
+            --danger: #c48675;
+            --dark: #0d0c0a;
+            --ink: #eee9df;
+            --muted: #aaa397;
+            --line: #403b32;
+            --surface: #191815;
+            --canvas: #100f0d;
+            --sidebar: #090908;
+            --shadow: 0 3px 14px #0005;
+            --metal-gold: #c5a45e;
+            --metal-silver: #b4bbc1;
+            --metal-bronze: #c48a55;
+            --metal-champagne: #dfc578;
+            --metal-copper: #ba8060;
+          }
+          .sidebar { color: #f4efe5; background: var(--sidebar); border-right: 1px solid var(--line); }
+          .brand-icon { color: #241b0c; background: var(--metal-gold); }
+          .nav-link.active { color: #21190c; background: var(--metal-gold); }
+          .nav-link.active .material-symbols-rounded { color: #21190c; }
+          .profile-avatar { color: #292115; background: var(--metal-silver); }
+          .topbar { border-color: var(--line); }
+          .live-context { border-color: var(--line); }
+          .primary-button, .module-button.primary, .chat-header, .clark-launcher,
+          .chat-message.user, .change-confirm {
+            color: #fffaf0;
+            background: var(--primary);
+            border-color: var(--primary);
+          }
+          .primary-button:hover, .module-button.primary:hover, .clark-launcher:hover { background: var(--metal-copper); }
+          .clark-avatar { color: #342819; background: #eee4cd; }
+          .chat-header span { color: #eee3ca; }
+          .module-button, .secondary-button, .icon-button, .schedule-attendance-link,
+          .status-choice, .success-outline, .danger-outline,
+          .attendance-save-actions .module-button:not(.save-attendance) {
+            color: var(--ink);
+            background: var(--surface);
+            border-color: var(--line);
+          }
+          .module-button:hover, .secondary-button:hover, .icon-button:hover { background: var(--primary-soft); border-color: var(--metal-gold); }
+          .search-control input, .date-control input, .module-search input, .module-select,
+          .filter-select, .module-dialog input, .module-dialog select, .module-dialog textarea,
+          .chat-input { color: var(--ink); background: var(--surface); border-color: var(--line); }
+          input:focus, select:focus, textarea:focus, button:focus-visible {
+            outline-color: var(--metal-gold) !important;
+            border-color: var(--metal-gold) !important;
+          }
+          .eyebrow, .member-id-cell, .attendee-meta-committee, .change-values,
+          .row-icon-button:hover { color: var(--primary); }
+          .stat-card, .panel, .module-panel, .report-shell, .demographic-card,
+          .schedule-card, .chat-panel, .module-dialog, .loader-box,
+          .reports-toolbar, .report-tabs, .report-panel, .official-template-shell,
+          .statistics-report-shell, .demographic-header, .today-attendance-card {
+            border-color: var(--line);
+            box-shadow: var(--shadow);
+            border-radius: 4px;
+          }
+          .stat-card::before { background: var(--metal-gold); }
+          .stats-cards .stat-card:nth-child(2)::before { background: var(--metal-silver); }
+          .stats-cards .stat-card:nth-child(3)::before { background: var(--metal-bronze); }
+          .stats-cards .stat-card:nth-child(4)::before { background: var(--metal-copper); }
+          .stat-icon, .demographic-card-icon { color: #72551e; background: #f1eadb; }
+          .today-attendance-card.featured {
+            color: #2e2412;
+            background: #d0b16b;
+            border-color: #b58b3d;
+          }
+          .today-attendance-card.featured .today-attendance-card-label,
+          .today-attendance-card.featured small { color: #4f3e1c; }
+          .today-attendance-card.featured strong { color: #21190c; }
+          .badge, .module-badge, .mini-badge, .count-chip, .attendee-meta-category,
+          .attendee-meta-status, .attendee-meta-id, .event-badges .badge,
+          .report-shell-header .badge-inline, .report-panel-header .badge-inline,
+          .official-report-header .badge-inline {
+            color: #51432a;
+            background: #eee7d8;
+            border-color: #d9cba9;
+          }
+          .badge-green, .module-badge.green, .attendance-badge.good,
+          .report-table .status-good, .status-good { color: #76591e; background: #f0e5c9; }
+          .badge-red, .module-badge.red, .attendance-badge.danger,
+          .report-table .status-danger, .status-danger { color: #754a3e; background: #eadbd4; }
+          .badge-amber, .module-badge.amber, .attendance-badge.warn,
+          .report-table .status-warn, .status-warn { color: #80522d; background: #f0e0cc; }
+          .badge-blue, .module-badge.blue, .module-badge.purple,
+          .report-table .status-blue, .report-table .status-purple,
+          .status-blue, .status-purple { color: #59636d; background: #e5e8e9; }
+          .trend-positive { color: #846522; }
+          .trend-negative { color: #8e5141; }
+          .module-table .rate-cell { color: #876729; }
+          .present-count { color: #755818; background: #f2e8d1; border-color: #d6c18e; }
+          .absent-count { color: #754a3e; background: #efe2dc; border-color: #d5b9ab; }
+          .late-count { color: #80522d; background: #f2e4d4; border-color: #dec3a3; }
+          .excused-count { color: #59636d; background: #e9ebeb; border-color: #c8cdd0; }
+          .unmarked-count { color: #54514a; background: #edebe5; border-color: #d4d0c6; }
+          .attendance-status-buttons .status-choice { color: var(--ink); background: #eeece6; border-color: #d8d2c5; }
+          .attendance-status-buttons .status-choice:hover,
+          .attendance-status-buttons .status-choice.selected { color: #fffaf0; background: var(--primary); border-color: var(--primary); }
+          body.dark-mode .attendance-status-buttons .status-choice:not(.selected) {
+            color: #272116;
+            background: #d9d1c2;
+            border-color: #84785f;
+          }
+          body.dark-mode .attendance-status-buttons .status-choice:not(.selected):hover {
+            color: #171209;
+            background: #e8ddc3;
+          }
+          body.dark-mode .attendance-status-buttons .status-choice.selected {
+            color: #21190c;
+            background: var(--metal-gold);
+            border-color: var(--metal-champagne);
+          }
+          .attendee-avatar { color: #73571f; background: #f0e9d9; border-color: #dac99f; }
+          .attendee-meta-id { color: #59636d; background: #e9ebeb; border-color: #c8cdd0; }
+          .attendee-meta-category, .attendee-meta-status { color: #66552f; background: #eee7d8; }
+          .module-table th { color: #554a34; background: #eee9df; }
+          .module-table td { border-color: var(--line); }
+          .module-table .id-cell { color: #65512b; }
+          .module-badge { color: #5c5342; background: #eee9df; border-color: #ddd5c6; }
+          .module-badge.green, .module-badge.red, .module-badge.amber,
+          .module-badge.purple, .module-badge.blue { border-color: #d8cdb7; }
+          .report-shell-header, .report-panel-header, .official-report-header,
+          .statistics-report-header, .official-sheet-top .cell.black {
+            color: #f7f1e5;
+            background: #29251e;
+            border-bottom-color: #806638;
+          }
+          .reports-btn { color: var(--ink); background: var(--surface); border-color: var(--line); border-radius: 4px; }
+          .reports-btn.primary { color: #fffaf0; background: var(--primary); border-color: var(--primary); }
+          .tab-pill.active { color: #60491d; background: #f2ead7; border-color: #c9ad6b; }
+          .legend-success { background: var(--metal-gold); }
+          .legend-warning { background: var(--metal-bronze); }
+          .legend-danger { background: var(--metal-copper); }
+          .legend-purple, .legend-blue { background: var(--metal-silver); }
+          .official-sheet-top .cell.header, .official-sheet-top .cell.black,
+          .official-template-table thead th { color: #f7f1e5; background: #29251e; }
+          .official-sheet-top .cell.muted, .official-sheet-top .cell.blue,
+          .official-sheet-top .cell.light-blue { color: #4f5962; background: #e3e6e7; border-color: #c7cdd0; }
+          .official-sheet-top .cell.gold, .official-sheet-top .cell.primary,
+          .official-template-table thead .top-title { color: #382b12; background: #d0b16b; border-color: #b58b3d; }
+          .official-sheet-top .cell.red, .official-sheet-top .cell.orange,
+          .official-sheet-top .cell.darkblue { color: #fff8ee; background: #9a6844; border-color: #835736; }
+          .official-sheet-top .cell.green, .official-sheet-top .cell.purple { color: #51432a; background: #eee3c8; border-color: #d8c79b; }
+          .official-template-table tbody td { color: var(--ink); background: var(--surface); }
+          .official-template-table tbody tr:nth-child(odd) td { background: #f0ece3; }
+          .report-table th, .statistics-report-table th { color: #f4eee1; background: #393329; border-color: #65563a; }
+          .report-table .total-row td, .official-summary-table .total-row td,
+          .statistics-total-row td { background: #eee5d2; }
+          .report-table tbody tr:nth-child(even), .statistics-report-table tbody tr:nth-child(even),
+          .module-table tbody tr:nth-child(even), tbody tr:nth-child(even) { background: #f0eee8; }
+          body.dark-mode .sidebar { background: #090908; border-right-color: #403a2e; }
+          body.dark-mode .nav-link.active { color: #241b0c; background: #c5a45e; }
+          body.dark-mode .nav-link.active .material-symbols-rounded { color: #241b0c; }
+          body.dark-mode .primary-button, body.dark-mode .module-button.primary,
+          body.dark-mode .chat-header, body.dark-mode .clark-launcher,
+          body.dark-mode .chat-message.user, body.dark-mode .change-confirm {
+            color: #241b0c;
+            background: #c5a45e;
+            border-color: #c5a45e;
+          }
+          body.dark-mode .today-attendance-card.featured { color: #241b0c; background: #c5a45e; border-color: #d3b76e; }
+          body.dark-mode .today-attendance-card.featured .today-attendance-card-label,
+          body.dark-mode .today-attendance-card.featured small { color: #47371b; }
+          body.dark-mode .today-attendance-card.featured strong { color: #21190c; }
+          body.dark-mode .stat-icon, body.dark-mode .demographic-card-icon { color: #dfc578; background: #393122; }
+          body.dark-mode .badge-green, body.dark-mode .badge-red,
+          body.dark-mode .badge-amber, body.dark-mode .badge-blue,
+          body.dark-mode .module-badge, body.dark-mode .mini-badge,
+          body.dark-mode .attendee-meta-category, body.dark-mode .attendee-meta-status {
+            color: #e8deca;
+            background: #39352d;
+            border-color: #5b5140;
+          }
+          body.dark-mode .present-count { color: #ead9ae; background: #393122; border-color: #715d31; }
+          body.dark-mode .absent-count { color: #e0c0b2; background: #382a25; border-color: #65483b; }
+          body.dark-mode .late-count { color: #e6c39b; background: #392f26; border-color: #69513a; }
+          body.dark-mode .excused-count, body.dark-mode .unmarked-count { color: #d7dcdf; background: #292c2d; border-color: #4a4f51; }
+          body.dark-mode .module-table th { color: #e8deca; background: #28251f; }
+          body.dark-mode .module-table td { border-color: #39352d; }
+          body.dark-mode .official-template-table tbody td { color: #eee9df; background: #191815; }
+          body.dark-mode .official-template-table tbody tr:nth-child(odd) td { background: #24221d; }
+          body.dark-mode .report-table tbody tr:nth-child(even),
+          body.dark-mode .statistics-report-table tbody tr:nth-child(even),
+          body.dark-mode .module-table tbody tr:nth-child(even),
+          body.dark-mode tbody tr:nth-child(even) { background: #24221d; }
+          body.dark-mode .report-table .total-row td,
+          body.dark-mode .official-summary-table .total-row td,
+          body.dark-mode .statistics-total-row td { background: #393122; }
+          body.dark-mode .event-history-item:hover,
+          body.dark-mode .event-history-item.selected { background: #393122; }
+          body.dark-mode .toast, body.dark-mode .toast.success, body.dark-mode .toast.error { background: #6f5423; }
+          canvas { filter: none; }
+          @media (max-width: 700px) {
+            .live-context {
+              display: flex;
+              align-items: center;
+              gap: 8px;
+              overflow: hidden;
+              white-space: nowrap;
+            }
+            .live-clock { flex: 0 0 auto; font-size: 8px; }
+            .live-gathering-title { flex: 1 1 auto; min-width: 0; }
+            #top-actions {
+              display: grid;
+              grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 34px 34px 32px 32px;
+              flex: 0 0 100%;
+              flex-wrap: nowrap;
+              align-items: center;
+              gap: 4px;
+              width: 100%;
+              overflow: visible;
+              padding: 0;
+            }
+            #top-actions .date-control { display: block; min-width: 0; }
+            #top-actions .date-control > span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; }
+            #top-actions .date-control input { width: 100%; min-width: 0; min-height: 33px; padding: 0 2px; font-size: 9px; }
+            #top-actions #apply-range { width: 34px; min-width: 34px; min-height: 33px; padding: 0; font-size: 0; }
+            #top-actions #apply-range .material-symbols-rounded { font-size: 16px; }
+            #top-actions .search-control { position: relative; width: 34px; min-width: 34px; height: 33px; }
+            #top-actions .search-control .material-symbols-rounded { z-index: 7; top: 8px; left: 8px; }
+            #top-actions .search-control input {
+              position: absolute;
+              top: 0;
+              right: 0;
+              z-index: 6;
+              width: 34px;
+              min-width: 34px;
+              min-height: 33px;
+              padding: 0;
+              font-size: 0;
+            }
+            #top-actions .search-control:focus-within input {
+              width: min(190px, calc(100vw - 96px));
+              min-width: 120px;
+              padding: 0 8px 0 30px;
+              background: var(--surface);
+              border-color: var(--metal-gold);
+              font-size: 11px;
+            }
+            #top-actions > .icon-button { width: 32px; min-width: 32px; height: 33px; }
+            .statistics-table-scroll, .members-directory-scroll { overflow-x: hidden; }
+            .statistics-table, .statistics-table tbody { display: block; width: 100%; min-width: 0; }
+            .statistics-table thead { display: none; }
+            .statistics-table tbody tr.statistics-data-row {
+              display: grid;
+              grid-template-columns: minmax(0, 1fr) auto 32px;
+              align-items: center;
+              gap: 0 6px;
+              padding: 3px 8px;
+            }
+            .statistics-table tbody tr.statistics-data-row td { min-width: 0; padding: 4px 0; border: 0; }
+            .statistics-table tbody tr.statistics-data-row td:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+            .statistics-table tbody tr.statistics-data-row td:nth-child(2) { white-space: nowrap; }
+            .statistics-table tbody tr.statistics-data-row td:nth-child(3),
+            .statistics-table tbody tr.statistics-data-row td:nth-child(4) { display: none; }
+            .statistics-table tbody tr.statistics-data-row td:nth-child(5) { justify-self: end; }
+            .statistics-table tbody tr.statistics-detail-row,
+            .statistics-table tbody tr:not(.statistics-data-row):not(.statistics-detail-row) { display: block; }
+            .statistics-table tbody tr.statistics-detail-row > td,
+            .statistics-table tbody tr:not(.statistics-data-row):not(.statistics-detail-row) td { display: block; width: 100%; }
+            .statistics-table .statistics-detail-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; padding: 10px; }
+            .members-directory-table, .members-directory-table tbody { display: block; width: 100%; min-width: 0; }
+            .members-directory-table thead { display: none; }
+            .members-directory-table tbody tr.directory-member-row {
+              display: grid;
+              grid-template-columns: max-content minmax(0, 1fr) auto auto 32px;
+              align-items: center;
+              gap: 0 4px;
+              padding: 5px 7px;
+            }
+            .members-directory-table tbody tr.directory-member-row td { min-width: 0; padding: 3px 0; border: 0; }
+            .members-directory-table tbody tr.directory-member-row td:nth-child(1) { grid-column: 1; white-space: nowrap; }
+            .members-directory-table tbody tr.directory-member-row td:nth-child(2) { grid-column: 2; overflow: hidden; white-space: nowrap; }
+            .members-directory-table tbody tr.directory-member-row td:nth-child(2) strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+            .members-directory-table tbody tr.directory-member-row td:nth-child(2) small { display: none; }
+            .members-directory-table tbody tr.directory-member-row td:nth-child(3) { grid-column: 3; }
+            .members-directory-table tbody tr.directory-member-row td:nth-child(4) { grid-column: 4; }
+            .members-directory-table tbody tr.directory-member-row td:nth-child(n+5):nth-child(-n+8) { display: none; }
+            .members-directory-table tbody tr.directory-member-row td:nth-child(9) { grid-column: 5; justify-self: end; }
+            .members-directory-table .row-actions { width: 32px; }
+            .members-directory-table .row-actions .row-icon-button:not(:first-child) { display: none; }
+            .members-directory-table tbody tr.directory-member-detail-row,
+            .members-directory-table tbody tr:not(.directory-member-row):not(.directory-member-detail-row) { display: block; }
+            .members-directory-table tbody tr.directory-member-detail-row > td,
+            .members-directory-table tbody tr:not(.directory-member-row):not(.directory-member-detail-row) td { display: block; width: 100%; }
+            .members-directory-table .directory-detail-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; padding: 10px; }
+            .members-directory-table .directory-detail-field { min-width: 0; overflow-wrap: anywhere; }
+            .members-directory-table .directory-detail-field:last-child { grid-column: 1 / -1; }
+            .module-titlebar { margin-bottom: 8px; }
+            .module-titlebar h2 { font-size: 18px; }
+            .module-caption { margin-top: 2px; font-size: 10px; }
+            .member-actions-row { gap: 6px; padding: 8px 10px; }
+            .member-actions-row .module-search { width: 100%; min-width: 0; flex: 0 0 auto; }
+            .member-actions-row .module-search input { min-height: 34px; }
+            .member-actions-row .action-buttons { display: grid; width: 100%; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; }
+            .member-actions-row .module-button { min-width: 0; min-height: 34px; gap: 3px; padding: 0 3px; font-size: 8px; white-space: nowrap; }
+            .member-actions-row .module-button .material-symbols-rounded { font-size: 14px; }
+            .member-filter-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 5px; min-height: 0; padding: 7px 10px; }
+            .member-filter-row .filter-label { grid-column: 1; }
+            .member-filter-row .module-select { width: 100%; min-width: 0; min-height: 31px; padding: 0 20px 0 7px; font-size: 9px; }
+            .member-filter-row .committee-select { min-width: 0; }
+            .member-filter-row .filter-count { grid-column: 2; margin: 0; text-align: right; white-space: normal; }
+            .clark-launcher.compact { padding-right: 6px; }
+            .clark-launcher.compact > span:not(.clark-avatar) { display: none; }
+            .fast-search-row {
+              display: grid;
+              grid-template-columns: repeat(3, minmax(0, 1fr));
+              align-items: center;
+              gap: 6px;
+              padding: 8px 10px;
+            }
+            .fast-search-row .module-search { grid-column: 1 / -1; width: 100%; min-width: 0; flex: none; }
+            .fast-search-row .module-select { width: 100%; min-width: 0; height: 34px; min-height: 34px; padding: 0 18px 0 6px; font-size: 9px; }
+            .fast-bulk-row { gap: 6px; padding: 0 10px 8px; }
+            .fast-bulk-row > div { display: grid; width: 100%; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 5px; }
+            .fast-bulk-row #mark-filtered-present { grid-column: 1 / -1; }
+            .fast-bulk-row .module-button { justify-content: center; min-height: 34px; padding: 0 5px; font-size: 9px; }
+          }
+        </style>
+        <section id="placeholder-page" class="placeholder-page"><div><span id="placeholder-icon" class="material-symbols-rounded">construction</span><h2 id="placeholder-title">Coming soon</h2><p>This workspace page is reserved for a future module.</p></div></section>
+      </main>
+    </div>
+  </div>
+
+  <div id="loading-cover" class="loading-cover" role="status" aria-live="polite"><div class="loader-box"><span class="spinner"></span><span id="loading-label">Loading live spreadsheet data...</span></div></div>
+  <div id="toast-stack" class="toast-stack" aria-live="polite"></div>
+
+  <button id="clark-launcher" class="clark-launcher" type="button" aria-expanded="false" aria-controls="clark-chat" onclick="toggleClarkChat()"><span class="clark-avatar" aria-hidden="true"><span class="material-symbols-rounded">robot_2</span></span><span>YOUTH OFFICERS ASSISTANT</span></button>
+  <section id="clark-chat" class="chat-panel" aria-label="Chat with Youth Officers Assistant">
+    <header class="chat-header"><div><strong>YOUTH OFFICERS ASSISTANT</strong><span>Attendance, members, and schedules</span></div><button class="chat-close" type="button" aria-label="Close chat" onclick="toggleClarkChat(false)"><span class="material-symbols-rounded">close</span></button></header>
+    <div id="chat-messages" class="chat-messages"><div class="chat-message">Ask about attendance patterns, member demographics, events, schedules, or data quality. Member detail edits are only saved after you confirm.</div></div>
+    <form id="chat-form" class="chat-form" onsubmit="sendClarkMessage(event)"><textarea id="chat-input" class="chat-input" rows="2" placeholder="Ask about attendance or members..." aria-label="Message Youth Officers Assistant" onkeydown="if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') this.form.requestSubmit()"></textarea><button id="chat-send" class="chat-send" type="submit" aria-label="Send message"><span class="material-symbols-rounded">send</span></button></form>
+  </section>
+
+  <script>
+    const state = {
+      data: null,
+      charts: Object.create(null),
+      page: 'Dashboard',
+      pageIndex: 1,
+      pageSize: 25,
+      sortKey: 'memberId',
+      sortDirection: 1,
+      gatheringEvents: [],
+      loadedPages: Object.create(null),
+      loadingPages: Object.create(null),
+      liveGathering: null,
+      gatheringAttendanceKey: '',
+      gatheringAttendanceSummary: null,
+      gatheringAttendanceRequest: null,
+      dashboardRangeKey: '',
+      dashboardRequestId: 0,
+      apiRequests: Object.create(null),
+      expandedMember: null,
+      expandedStatistic: null,
+      chatHistory: [],
+      chatBusy: false,
+      pendingChanges: null
+    };
+    const navIcons = {
+      Dashboard: 'space_dashboard', Members: 'group', 'Fast Attendance': 'how_to_reg',
+      'Weekly Schedule': 'event_repeat', 'Special Events': 'event', 'Event History': 'history', Announcements: 'campaign', Demographics: 'bar_chart',
+      Statistics: 'query_stats', Reports: 'description', Settings: 'settings'
+    };
+    const lastPageStorageKey = 'attendance-dashboard-last-page';
+
+    function apiCall(method, ...args) {
+      const key = JSON.stringify([method, args]);
+      if (state.apiRequests[key]) return state.apiRequests[key];
+      const request = new Promise((resolve, reject) => {
+        const runner = google.script.run.withSuccessHandler(resolve).withFailureHandler(reject);
+        runner[method](...args);
+      }).finally(() => { delete state.apiRequests[key]; });
+      state.apiRequests[key] = request;
+      return request;
+    }
+
+    function showToast(message, type) {
+      const toast = document.createElement('div');
+      toast.className = `toast ${type || ''}`;
+      toast.textContent = message;
+      document.getElementById('toast-stack').appendChild(toast);
+      window.setTimeout(() => toast.remove(), 3800);
+    }
+
+    function logAction(action, details) {
+      apiCall('logAction', action, details || {}).catch(error => console.error('Audit log error:', error));
+    }
+
+    window.runButtonAction = async function(button, action, loadingLabel) {
+      if (!button) return action();
+      if (button.dataset.loading === 'true') return;
+      const originalHtml = button.innerHTML;
+      const originalDisabled = button.disabled;
+      const originalWidth = button.style.width;
+      const originalTitle = button.title;
+      const originalAriaLabel = button.getAttribute('aria-label');
+      const measuredWidth = button.getBoundingClientRect().width;
+      button.dataset.loading = 'true';
+      button.disabled = true;
+      button.setAttribute('aria-busy', 'true');
+      if (measuredWidth) button.style.width = `${measuredWidth}px`;
+      const spinner = document.createElement('span'); spinner.className = 'button-loading-spinner'; spinner.setAttribute('aria-hidden', 'true');
+      if (button.classList.contains('row-icon-button')) {
+        button.replaceChildren(spinner);
+        button.title = loadingLabel || 'Working...';
+        button.setAttribute('aria-label', loadingLabel || 'Working...');
+      } else {
+        const label = document.createElement('span'); label.textContent = loadingLabel || 'Working...';
+        button.replaceChildren(spinner, label);
+      }
+      try {
+        return await action();
+      } finally {
+        button.innerHTML = originalHtml;
+        button.disabled = originalDisabled;
+        button.style.width = originalWidth;
+        button.title = originalTitle;
+        if (originalAriaLabel === null) button.removeAttribute('aria-label');
+        else button.setAttribute('aria-label', originalAriaLabel);
+        button.removeAttribute('aria-busy');
+        delete button.dataset.loading;
+      }
+    };
+
+    function loadModuleOnce(page, loader) {
+      if (state.loadedPages[page] || state.loadingPages[page]) return;
+      state.loadingPages[page] = true;
+      Promise.resolve().then(loader).catch(error => {
+        console.error(`${page} load error:`, error);
+      }).finally(() => {
+        state.loadingPages[page] = false;
+      });
+    }
+
+    function formatNumber(value) {
+      return (Number(value) || 0).toLocaleString();
+    }
+
+    function formatPercent(value, digits) {
+      return value === null || value === undefined || !Number.isFinite(Number(value))
+        ? '—'
+        : `${(Number(value) * 100).toFixed(digits === undefined ? 1 : digits)}%`;
+    }
+
+    function escapeHtml(value) {
+      return String(value || '').replace(/[&<>"']/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character]);
+    }
+
+    function makeBadge(label, tone) {
+      const badge = document.createElement('span');
+      badge.className = `module-badge ${tone || 'quiet'}`;
+      badge.textContent = label || 'Not set';
+      return badge;
+    }
+
+    function dateInputValue(date) {
+      return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+    }
+
+    function initializeDateRange() {
+      const end = new Date();
+      const start = new Date(end.getFullYear(), end.getMonth() - 11, 1);
+      document.getElementById('date-from').value = dateInputValue(start);
+      document.getElementById('date-to').value = dateInputValue(end);
+    }
+
+    async function loadDashboard(useDateRange, silent) {
+      const startDate = document.getElementById('date-from').value;
+      const endDate = document.getElementById('date-to').value;
+      if (startDate && endDate && startDate > endDate) {
+        showToast('The From date must be before the To date.', 'error');
+        return;
+      }
+      const rangeKey = JSON.stringify([useDateRange ? 'range' : 'default', startDate, endDate]);
+      const requestId = ++state.dashboardRequestId;
+      if (!state.data) {
+        try {
+          const cached = JSON.parse(localStorage.getItem('attendance-dashboard-cache-v1') || 'null');
+          if (cached && cached.rangeKey === rangeKey && cached.data && cached.data.summary) {
+            state.data = cached.data;
+            state.dashboardRangeKey = rangeKey;
+            renderDashboard(cached.data);
+          }
+        } catch (error) {
+          console.warn('Dashboard cache could not be read:', error);
+        }
+      }
+      try {
+        const method = useDateRange ? 'getDateRangeStats' : 'getMembersStatistics';
+        const [data, session] = await Promise.all([
+          apiCall(method, startDate, endDate),
+          apiCall('getAttendanceSession')
+        ]);
+        if (requestId !== state.dashboardRequestId) return;
+        const changed = state.dashboardRangeKey !== rangeKey || JSON.stringify(state.data) !== JSON.stringify(data);
+        state.data = data;
+        state.dashboardRangeKey = rangeKey;
+        if (changed) renderDashboard(data);
+        renderSession(session);
+        try {
+          localStorage.setItem('attendance-dashboard-cache-v1', JSON.stringify({ rangeKey: rangeKey, data: data }));
+        } catch (error) {
+          console.warn('Dashboard cache could not be saved:', error);
+        }
+        if (!silent) logAction(useDateRange ? 'APPLY_DATE_FILTER' : 'REFRESH_DASHBOARD', { startDate, endDate });
+      } catch (error) {
+        if (requestId !== state.dashboardRequestId) return;
+        console.error('Dashboard load error:', error);
+        if (!silent) showToast(error && error.message ? error.message : 'Unable to load spreadsheet data.', 'error');
+      }
+    }
+
+    function renderGatheringAttendanceCards(summary, gathering) {
+      const eventName = gathering ? summary.eventName || gathering.eventName : '';
+      const rawScheduleLabel = gathering ? gathering.scheduleName || gathering.scheduleTime : '';
+      const scheduleLabel = rawScheduleLabel ? formatScheduleName(rawScheduleLabel) : '';
+      document.getElementById('today-present-label').textContent = gathering ? `Present in ${eventName}` : 'Present today';
+      document.getElementById('today-unmarked-label').textContent = gathering ? `Unmarked for ${eventName}` : 'Unmarked';
+      document.getElementById('today-late-label').textContent = gathering ? `Late in ${eventName}` : 'Late';
+      document.getElementById('today-absent-label').textContent = gathering ? `Absent in ${eventName}` : 'Absent';
+      document.getElementById('today-present-count').textContent = formatNumber(summary.present);
+      document.getElementById('today-unmarked-count').textContent = formatNumber(summary.unmarked);
+      document.getElementById('today-late-count').textContent = formatNumber(summary.late);
+      document.getElementById('today-absent-count').textContent = formatNumber(summary.absent);
+      document.getElementById('today-present-detail').textContent = gathering
+        ? `${summary.date} · ${summary.batchCount} batch${summary.batchCount === 1 ? '' : 'es'} through ${scheduleLabel}`
+        : `${summary.date} · all batches`;
+      document.getElementById('today-unmarked-detail').textContent = `${formatNumber(summary.activeMembers)} active members`;
+      document.getElementById('today-late-detail').textContent = gathering
+        ? `${summary.date} · ${summary.batchCount} batch${summary.batchCount === 1 ? '' : 'es'} through ${scheduleLabel}`
+        : `${summary.date} · all batches`;
+      document.getElementById('today-absent-detail').textContent = gathering
+        ? `${summary.date} · ${summary.batchCount} batch${summary.batchCount === 1 ? '' : 'es'} through ${scheduleLabel}`
+        : `${summary.date} · all batches`;
+      document.getElementById('today-present-card').setAttribute('aria-label', `View attendees for ${eventName || 'today'}`);
+    }
+
+    async function loadTodayAttendanceCards(forceRefresh) {
+      const gathering = state.liveGathering;
+      const key = gathering
+        ? `${gathering.eventId}|${gathering.scheduleId}|${gathering.date}|${gathering.started}`
+        : `today|${dateInputValue(new Date())}`;
+      if (state.gatheringAttendanceKey === key) {
+        if (state.gatheringAttendanceRequest) return state.gatheringAttendanceRequest;
+        if (state.gatheringAttendanceSummary && !forceRefresh) {
+          renderGatheringAttendanceCards(state.gatheringAttendanceSummary, gathering);
+          return state.gatheringAttendanceSummary;
+        }
+      }
+
+      const sameGathering = state.gatheringAttendanceKey === key;
+      state.gatheringAttendanceKey = key;
+      if (!sameGathering) {
+        state.gatheringAttendanceSummary = null;
+        try {
+          const cached = JSON.parse(localStorage.getItem('attendance-gathering-cache-v1') || 'null');
+          if (cached && cached.key === key && cached.summary) {
+            state.gatheringAttendanceSummary = cached.summary;
+            renderGatheringAttendanceCards(cached.summary, gathering);
+          } else {
+            ['today-present-count', 'today-unmarked-count', 'today-late-count', 'today-absent-count'].forEach(id => {
+              document.getElementById(id).textContent = '—';
+            });
+            ['today-present-detail', 'today-unmarked-detail', 'today-late-detail', 'today-absent-detail'].forEach(id => {
+              document.getElementById(id).textContent = 'Checking schedule...';
+            });
+          }
+        } catch (error) {
+          console.warn('Attendance summary cache could not be read:', error);
+        }
+      }
+      if (gathering && !gathering.started) {
+        ['today-present-detail', 'today-unmarked-detail', 'today-late-detail', 'today-absent-detail'].forEach(id => {
+          document.getElementById(id).textContent = 'Available when the schedule begins';
+        });
+        return null;
+      }
+      const request = (gathering
+        ? apiCall('getGatheringAttendanceSummary', gathering.eventId, gathering.date, gathering.scheduleId)
+        : apiCall('getTodayAttendanceSummary')
+      ).then(summary => {
+        if (state.gatheringAttendanceKey !== key) return summary;
+        const changed = JSON.stringify(state.gatheringAttendanceSummary) !== JSON.stringify(summary);
+        state.gatheringAttendanceSummary = summary;
+        if (changed || !sameGathering) renderGatheringAttendanceCards(summary, gathering);
+        try {
+          localStorage.setItem('attendance-gathering-cache-v1', JSON.stringify({ key: key, summary: summary }));
+        } catch (error) {
+          console.warn('Attendance summary cache could not be saved:', error);
+        }
+        return summary;
+      }).catch(error => {
+        console.error('Gathering attendance summary error:', error);
+        if (state.gatheringAttendanceKey === key && !state.gatheringAttendanceSummary) {
+          document.getElementById('today-present-detail').textContent = 'Unable to load gathering attendance';
+        }
+        return null;
+      }).finally(() => {
+        if (state.gatheringAttendanceRequest === request) state.gatheringAttendanceRequest = null;
+      });
+      state.gatheringAttendanceRequest = request;
+      return request;
+    }
+
+    function showGatheringAttendees(statusFilter) {
+      const summary = state.gatheringAttendanceSummary;
+      if (!summary) {
+        showToast('Gathering attendance is still loading.', 'error');
+        return;
+      }
+      const filter = statusFilter || 'All';
+      const attendees = filter === 'All' ? summary.attendees : summary.attendees.filter(attendee => attendee.status === filter);
+      const gathering = state.liveGathering;
+      const scheduleLabel = gathering && gathering.scheduleName
+        ? formatScheduleName(gathering.scheduleName)
+        : gathering && gathering.scheduleTime;
+      document.getElementById('gathering-attendees-title').textContent = `${filter === 'All' ? 'All' : filter} · ${summary.eventName}`;
+      document.getElementById('gathering-attendees-summary').textContent =
+        `${summary.date} · ${attendees.length} member${attendees.length === 1 ? '' : 's'}` +
+        (scheduleLabel
+          ? ` · ${summary.batchCount} cumulative batch${summary.batchCount === 1 ? '' : 'es'} through ${scheduleLabel}`
+          : ' · records from all schedule batches');
+      const list = document.getElementById('gathering-attendees-list');
+      list.replaceChildren();
+      if (!attendees.length) {
+        const empty = document.createElement('p'); empty.className = 'gathering-attendee-empty';
+        empty.textContent = filter === 'All'
+          ? 'No active members or attendance records were found for this gathering.'
+          : `No members are marked ${filter.toLowerCase()} for this gathering.`;
+        list.appendChild(empty);
+      }
+      attendees.forEach(attendee => {
+        const row = document.createElement('div'); row.className = 'gathering-attendee-row';
+        const name = document.createElement('strong'); name.className = 'gathering-attendee-name'; name.textContent = attendee.name;
+        const meta = document.createElement('span'); meta.className = 'gathering-attendee-meta';
+        meta.textContent = [attendee.memberId, attendee.schedule].filter(Boolean).join(' · ');
+        const badge = document.createElement('span'); badge.className = `badge ${attendee.status === 'Present' ? 'badge-green' : attendee.status === 'Late' ? 'badge-amber' : attendee.status === 'Absent' ? 'badge-red' : 'badge-blue'}`;
+        badge.textContent = attendee.status;
+        row.append(name, meta, badge); list.appendChild(row);
+      });
+      document.getElementById('gathering-attendees-dialog').showModal();
+    }
+
+    function renderSession(session) {
+      const identity = session.name || session.email || 'Secretary / Admin';
+      const shortName = identity.includes('@') ? identity.split('@')[0] : identity;
+      document.getElementById('sidebar-user').textContent = shortName;
+      document.getElementById('sidebar-avatar').textContent = shortName.split(/[ ._-]+/).filter(Boolean).slice(0, 2).map(part => part[0].toUpperCase()).join('') || 'SA';
+      document.getElementById('profile-button').title = session.email || identity;
+    }
+
+    function renderDashboard(data) {
+      const summary = data.summary;
+      const startDate = document.getElementById('date-from').value;
+      const endDate = document.getElementById('date-to').value;
+      document.getElementById('period-label').textContent = `${startDate} to ${endDate} · ${formatNumber(summary.totalEvents)} scheduled events`;
+      document.getElementById('total-members').textContent = formatNumber(summary.totalMembers);
+      const change = Number(summary.memberChangePercent);
+      const changeElement = document.getElementById('member-change');
+      changeElement.textContent = Number.isFinite(change) ? `${change > 0 ? '+' : ''}${(change * 100).toFixed(0)}%` : summary.newMembers ? `${formatNumber(summary.newMembers)} new` : 'No baseline';
+      changeElement.className = Number.isFinite(change) && change < 0 ? 'trend-negative' : 'trend-positive';
+      const activeShare = summary.totalMembers ? summary.activeMembers / summary.totalMembers : 0;
+      document.getElementById('active-members').textContent = formatNumber(summary.activeMembers);
+      document.getElementById('active-share').textContent = `${formatPercent(activeShare)} of total members`;
+      document.getElementById('average-attendance').textContent = formatPercent(summary.averageAttendancePercent);
+      document.getElementById('attendance-detail').textContent = `${formatNumber(summary.attendanceCount)} attendance records · ${formatNumber(summary.totalEvents)} events`;
+      document.getElementById('at-risk-members').textContent = formatNumber(summary.atRiskMembers);
+      document.getElementById('risk-share').textContent = `${formatPercent(summary.totalMembers ? summary.atRiskMembers / summary.totalMembers : 0)} of members below 50%`;
+      if (state.gatheringEvents.length) loadTodayAttendanceCards();
+      renderCharts(data);
+      renderStatistics(data);
+      state.pageIndex = 1;
+      renderMembers();
+    }
+
+    function chartTheme() {
+      const styles = getComputedStyle(document.body);
+      return { ink: styles.getPropertyValue('--muted').trim(), line: styles.getPropertyValue('--line').trim() };
+    }
+
+    function drawChart(id, config) {
+      const canvas = document.getElementById(id);
+      if (!canvas) return;
+      if (!window.Chart) {
+        canvas.replaceWith(Object.assign(document.createElement('p'), { className: 'empty-state', textContent: 'Charts could not load. Check the network connection and refresh.' }));
+        return;
+      }
+      if (state.charts[id]) state.charts[id].destroy();
+      state.charts[id] = new Chart(canvas, config);
+    }
+
+    function renderCharts(data) {
+      const colors = ['#b58b3d', '#a4abb2', '#b8793e', '#8b5e3c', '#d3b76e', '#737b83', '#c99762', '#4b4334'];
+      const theme = chartTheme();
+      const legend = { position: 'bottom', labels: { color: theme.ink, usePointStyle: true, pointStyle: 'circle', boxWidth: 7, padding: 14, font: { family: 'DM Sans', size: 9 } } };
+      const common = { responsive: true, maintainAspectRatio: false, plugins: { legend } };
+      drawChart('status-chart', {
+        type: 'doughnut',
+        data: { labels: data.membershipStatuses.map(item => item.name), datasets: [{ data: data.membershipStatuses.map(item => item.count), backgroundColor: colors.slice(0, data.membershipStatuses.length), borderWidth: 0, hoverOffset: 4 }] },
+        options: { ...common, cutout: '67%', plugins: { ...common.plugins, tooltip: { callbacks: { label: context => `${context.label}: ${formatNumber(context.raw)}` } } } }
+      });
+      drawChart('category-chart', {
+        type: 'bar', data: { labels: data.categories.map(item => item.name), datasets: [{ label: 'Members', data: data.categories.map(item => item.count), backgroundColor: ['#b58b3d', '#a4abb2'], borderRadius: 4, maxBarThickness: 58 }] },
+        options: { ...common, plugins: { legend: { display: false } }, scales: { x: { grid: { display: false }, ticks: { color: theme.ink, font: { family: 'DM Sans', size: 9 } } }, y: { beginAtZero: true, grid: { color: theme.line }, ticks: { precision: 0, color: theme.ink, font: { family: 'DM Sans', size: 9 } } } } }
+      });
+      drawChart('activity-chart', {
+        type: 'pie', data: { labels: data.activityStatuses.map(item => item.name), datasets: [{ data: data.activityStatuses.map(item => item.count), backgroundColor: ['#b58b3d', '#8b5e3c', '#b8793e'], borderWidth: 0, hoverOffset: 4 }] },
+        options: { ...common, plugins: { ...common.plugins, tooltip: { callbacks: { label: context => `${context.label}: ${formatNumber(context.raw)}` } } } }
+      });
+      drawChart('trend-chart', {
+        type: 'line', data: { labels: data.attendanceTrend.map(item => item.label), datasets: [{ label: 'Attendance rate', data: data.attendanceTrend.map(item => item.rate * 100), borderColor: '#b58b3d', backgroundColor: '#b58b3d30', fill: true, tension: .28, pointRadius: 2.5, pointHoverRadius: 5, borderWidth: 2 }] },
+        options: { ...common, plugins: { legend: { display: false }, tooltip: { callbacks: { label: context => `${context.dataset.label}: ${context.parsed.y.toFixed(1)}%` } } }, scales: { x: { grid: { display: false }, ticks: { maxRotation: 0, autoSkip: true, color: theme.ink, font: { family: 'DM Sans', size: 8 } } }, y: { beginAtZero: true, max: 100, grid: { color: theme.line }, ticks: { color: theme.ink, callback: value => `${value}%`, font: { family: 'DM Sans', size: 8 } } } } }
+      });
+    }
+
+    function renderStatistics(data) {
+      const tbody = document.getElementById('statistics-rows');
+      tbody.replaceChildren();
+      data.statisticsRows.forEach(item => {
+        const row = document.createElement('tr'); row.className = 'statistics-data-row';
+        const metric = document.createElement('td'); metric.textContent = item.metric;
+        const count = document.createElement('td'); count.textContent = formatNumber(item.count);
+        const percent = document.createElement('td'); percent.textContent = formatPercent(item.percent);
+        const trend = document.createElement('td');
+        const trendValue = Number(item.trendPercent);
+        if (item.trendPercent === null && item.count > 0) {
+          trend.textContent = 'New';
+          trend.className = 'trend-positive';
+        } else if (item.trendPercent !== null && item.trendPercent !== undefined && Number.isFinite(trendValue)) {
+          trend.textContent = `${trendValue > 0 ? '↑' : trendValue < 0 ? '↓' : '→'} ${Math.abs(trendValue).toFixed(0)}%`;
+          trend.className = trendValue > 0 ? 'trend-positive' : trendValue < 0 ? 'trend-negative' : '';
+        } else trend.textContent = '—';
+        const actionCell = document.createElement('td');
+        const viewButton = document.createElement('button');
+        viewButton.type = 'button'; viewButton.className = 'member-view-button';
+        viewButton.title = 'View full statistics details';
+        viewButton.setAttribute('aria-label', `View full details for ${item.metric}`);
+        viewButton.setAttribute('aria-expanded', String(state.expandedStatistic === item.metric));
+        viewButton.innerHTML = '<span class="material-symbols-rounded" aria-hidden="true">visibility</span>';
+        viewButton.addEventListener('click', () => {
+          state.expandedStatistic = state.expandedStatistic === item.metric ? null : item.metric;
+          renderStatistics(data);
+        });
+        row.append(metric, count, percent, trend, actionCell);
+        actionCell.appendChild(viewButton);
+        tbody.appendChild(row);
+        if (state.expandedStatistic === item.metric) {
+          const detailRow = document.createElement('tr'); detailRow.className = 'statistics-detail-row';
+          const detailCell = document.createElement('td'); detailCell.colSpan = 5;
+          const detailGrid = document.createElement('div'); detailGrid.className = 'detail-grid statistics-detail-grid';
+          detailGrid.append(detailField('Percentage', formatPercent(item.percent)), detailField('Trend', trend.textContent));
+          detailCell.appendChild(detailGrid); detailRow.appendChild(detailCell); tbody.appendChild(detailRow);
+        }
+      });
+    }
+
+    function filteredMembers() {
+      const query = document.getElementById('global-search').value.trim().toLowerCase();
+      const status = document.getElementById('status-filter').value.toLowerCase();
+      const category = document.getElementById('category-filter').value.toLowerCase();
+      const activity = document.getElementById('activity-filter').value.toLowerCase();
+      return (state.data ? state.data.members : []).filter(member =>
+        `${member.memberId} ${member.name} ${member.membershipStatus} ${member.category} ${member.activityStatus}`.toLowerCase().includes(query) &&
+        (!status || member.membershipStatus.toLowerCase() === status) &&
+        (!category || member.category.toLowerCase() === category) &&
+        (!activity || member.activityStatus.toLowerCase() === activity)
+      ).sort((a, b) => {
+        let first = a[state.sortKey]; let second = b[state.sortKey];
+        if (first === null || first === undefined) first = '';
+        if (second === null || second === undefined) second = '';
+        if (typeof first === 'number' && typeof second === 'number') return (first - second) * state.sortDirection;
+        return String(first).localeCompare(String(second), undefined, { numeric: true, sensitivity: 'base' }) * state.sortDirection;
+      });
+    }
+
+    function badgeClass(member) {
+      if (member.activityStatus === 'At Risk') return 'badge-red';
+      if (member.activityStatus === 'Active') return 'badge-amber';
+      if (member.activityStatus === 'Regular') return 'badge-green';
+      return /active/i.test(member.membershipStatus) && !/inactive/i.test(member.membershipStatus) ? 'badge-green' : 'badge-amber';
+    }
+
+    function detailField(label, value) {
+      const field = document.createElement('div'); field.className = 'detail-field';
+      const title = document.createElement('span'); title.textContent = label;
+      const detail = document.createElement('strong'); detail.textContent = value === null || value === undefined || value === '' ? 'Not recorded' : value;
+      field.append(title, detail); return field;
+    }
+
+    function renderMemberDetail(member) {
+      const row = document.createElement('tr'); row.className = 'detail-row';
+      const cell = document.createElement('td'); cell.colSpan = 8;
+      const grid = document.createElement('div'); grid.className = 'detail-grid';
+      [
+        ['Member ID', member.memberId], ['Name', member.name], ['Membership status', member.membershipStatus],
+        ['Category', member.category], ['Activity status', member.activityStatus], ['Last attendance', member.lastAttendanceDate],
+        ['Attendance', formatPercent(member.attendancePercent)], ['Attendance count', formatNumber(member.attendanceCount)],
+        ['Gender', member.gender], ['Age', member.age], ['Student status', member.studentStatus],
+        ['Employment', member.employmentStatus], ['Committees', member.committees], ['Registered', member.dateRegistered],
+        ['Activity reason', member.activityReason], ['Notes', member.notes]
+      ].forEach(([label, value]) => grid.appendChild(detailField(label, String(value ?? ''))));
+      cell.appendChild(grid); row.appendChild(cell); return row;
+    }
+
+    function toggleMemberDetails(memberId) {
+      state.expandedMember = state.expandedMember === memberId ? null : memberId;
+      logAction('VIEW_MEMBER_DETAILS', { memberId });
+      renderMembers();
+    }
+
+    function renderMembers() {
+      if (!state.data) return;
+      const members = filteredMembers();
+      const totalPages = Math.max(1, Math.ceil(members.length / state.pageSize));
+      state.pageIndex = Math.min(state.pageIndex, totalPages);
+      const startIndex = (state.pageIndex - 1) * state.pageSize;
+      const visible = members.slice(startIndex, startIndex + state.pageSize);
+      document.getElementById('members-count-label').textContent = `${formatNumber(members.length)} matching members · select a row for details`;
+      const tbody = document.getElementById('member-rows'); tbody.replaceChildren();
+      if (!visible.length) {
+        const row = document.createElement('tr'); const cell = document.createElement('td');
+        cell.colSpan = 8; cell.textContent = 'No members match the selected filters.'; cell.className = 'empty-state';
+        row.appendChild(cell); tbody.appendChild(row);
+      }
+      visible.forEach(member => {
+        const row = document.createElement('tr'); row.className = 'member-row'; row.tabIndex = 0; row.setAttribute('aria-expanded', String(state.expandedMember === member.memberId));
+        const values = [member.memberId, member.name || 'Name not recorded', member.membershipStatus, member.category, member.activityStatus, member.lastAttendanceDate || 'Not recorded', formatPercent(member.attendancePercent)];
+        values.forEach((value, index) => {
+          const cell = document.createElement('td');
+          if (index === 0) { cell.className = 'member-id-cell'; cell.textContent = value; }
+          else if (index === 1) { cell.className = 'member-name-cell'; cell.textContent = value; }
+          else if (index === 4 || index === 2) { const badge = document.createElement('span'); badge.className = `badge ${index === 2 ? (/^active$/i.test(value) ? 'badge-green' : 'badge-amber') : badgeClass(member)}`; badge.textContent = value; cell.appendChild(badge); }
+          else cell.textContent = value;
+          row.appendChild(cell);
+        });
+        const actionCell = document.createElement('td');
+        const viewButton = document.createElement('button');
+        viewButton.type = 'button'; viewButton.className = 'member-view-button';
+        viewButton.title = 'View full member details';
+        viewButton.setAttribute('aria-label', `View full details for ${member.name || member.memberId}`);
+        viewButton.setAttribute('aria-expanded', String(state.expandedMember === member.memberId));
+        viewButton.innerHTML = '<span class="material-symbols-rounded" aria-hidden="true">visibility</span>';
+        viewButton.addEventListener('click', event => { event.stopPropagation(); toggleMemberDetails(member.memberId); });
+        actionCell.appendChild(viewButton); row.appendChild(actionCell);
+        row.addEventListener('click', () => toggleMemberDetails(member.memberId));
+        row.addEventListener('keydown', event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); row.click(); } });
+        tbody.appendChild(row);
+        if (state.expandedMember === member.memberId) tbody.appendChild(renderMemberDetail(member));
+      });
+      document.getElementById('pagination-copy').textContent = members.length ? `Showing ${startIndex + 1}–${Math.min(startIndex + state.pageSize, members.length)} of ${members.length}` : 'Showing 0 members';
+      renderPagination(totalPages);
+    }
+
+    function renderPagination(totalPages) {
+      const container = document.getElementById('pagination-actions'); container.replaceChildren();
+      const previous = document.createElement('button'); previous.className = 'page-button'; previous.textContent = '‹'; previous.disabled = state.pageIndex <= 1; previous.setAttribute('aria-label', 'Previous page'); previous.addEventListener('click', () => changePage(state.pageIndex - 1)); container.appendChild(previous);
+      const first = Math.max(1, state.pageIndex - 2); const last = Math.min(totalPages, first + 4);
+      for (let page = first; page <= last; page += 1) {
+        const button = document.createElement('button'); button.className = `page-button${page === state.pageIndex ? ' active' : ''}`; button.textContent = String(page); button.addEventListener('click', () => changePage(page)); container.appendChild(button);
+      }
+      const next = document.createElement('button'); next.className = 'page-button'; next.textContent = '›'; next.disabled = state.pageIndex >= totalPages; next.setAttribute('aria-label', 'Next page'); next.addEventListener('click', () => changePage(state.pageIndex + 1)); container.appendChild(next);
+    }
+
+    function changePage(page) { state.pageIndex = page; renderMembers(); }
+
+    function exportCsv() {
+      if (!state.data) return;
+      const rows = [['Metric', 'Count', 'Percentage', 'Trend']];
+      state.data.statisticsRows.forEach(row => rows.push([row.metric, row.count, row.percent === null ? '' : (row.percent * 100).toFixed(1) + '%', row.trendPercent ?? '']));
+      rows.push([], ['Member ID', 'Name', 'Membership Status', 'Category', 'Activity Status', 'Last Attendance', 'Attendance Count', 'Attendance Percentage']);
+      filteredMembers().forEach(member => rows.push([member.memberId, member.name, member.membershipStatus, member.category, member.activityStatus, member.lastAttendanceDate, member.attendanceCount, member.attendancePercent === null ? '' : (member.attendancePercent * 100).toFixed(1) + '%']));
+      const csv = rows.map(row => row.map(value => `"${String(value ?? '').replace(/"/g, '""')}"`).join(',')).join('\r\n');
+      const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8' });
+      const url = URL.createObjectURL(blob); const link = document.createElement('a');
+      link.href = url; link.download = `members-statistics-${dateInputValue(new Date())}.csv`; link.click(); URL.revokeObjectURL(url);
+      logAction('EXPORT_CSV', { memberCount: filteredMembers().length });
+      showToast('Statistics and filtered member rows exported.', 'success');
+    }
+
+    function navigateTo(page) {
+      state.page = page;
+      localStorage.setItem(lastPageStorageKey, page);
+      document.querySelectorAll('.nav-link').forEach(link => {
+        const active = link.dataset.page === page;
+        link.classList.toggle('active', active);
+        if (active) link.setAttribute('aria-current', 'page'); else link.removeAttribute('aria-current');
+      });
+      const pageViews = {
+        Members: 'members-page',
+        'Fast Attendance': 'fast-attendance-page',
+        'Weekly Schedule': 'weekly-schedule-page',
+        'Special Events': 'special-events-page',
+        'Event History': 'event-history-page',
+        Demographics: 'demographics-page',
+        Statistics: 'statistics-page-module',
+        Reports: 'reports-page',
+      };
+      const isStatistics = page === 'Statistics';
+      const hasModule = Boolean(pageViews[page]);
+      const showStatisticsPlaceholder = page === 'Dashboard';
+      document.getElementById('statistics-page').hidden = page !== 'Dashboard';
+      document.getElementById('demographics-page').hidden = page !== 'Demographics';
+      document.getElementById('statistics-page-module').hidden = page !== 'Statistics';
+      document.getElementById('reports-page').hidden = page !== 'Reports';
+      Object.values(pageViews).forEach(id => { document.getElementById(id).hidden = pageViews[page] !== id; });
+      const placeholder = document.getElementById('placeholder-page');
+      placeholder.classList.toggle('show', !hasModule && !showStatisticsPlaceholder && page !== 'Demographics' && page !== 'Statistics' && page !== 'Reports');
+      document.getElementById('page-title').textContent = page === 'Dashboard' ? 'Members Statistics' : page;
+      document.getElementById('header-subtitle').textContent = page === 'Dashboard' ? 'Membership and attendance overview' : page === 'Demographics' ? 'Official demographic report' : page === 'Statistics' ? 'Membership statistics breakdown' : page === 'Reports' ? 'Administrative reporting overview' : page === 'Special Events' ? 'Create programs and schedule one-time gatherings' : page === 'Event History' ? 'Past event programs and saved attendance' : hasModule ? 'Membership office workspace' : `${page} module · planned workspace`;
+      document.getElementById('top-actions').style.display = page === 'Dashboard' ? '' : 'none';
+      document.getElementById('clark-launcher').classList.toggle('compact', page === 'Members');
+      document.getElementById('placeholder-title').textContent = page === 'Dashboard' ? 'Dashboard is empty for now' : page;
+      document.getElementById('placeholder-icon').textContent = navIcons[page] || 'construction';
+      document.getElementById('chat-input').placeholder = page === 'Fast Attendance'
+        ? 'Paste names and say Present, Absent, Late, or Excused...'
+        : 'Ask about the membership data...';
+      if (window.innerWidth <= 900) closeMobileNav();
+      logAction('NAVIGATE', { page });
+      if (page === 'Members') loadModuleOnce(page, loadMembersPage);
+      if (page === 'Fast Attendance') loadModuleOnce(page, loadFastAttendance);
+      if (page === 'Weekly Schedule') loadModuleOnce(page, loadWeeklySchedule);
+      if (page === 'Special Events') loadModuleOnce(page, loadSpecialEvents);
+      if (page === 'Event History') loadModuleOnce(page, loadEventHistory);
+    }
+
+    function openMobileNav() { document.getElementById('sidebar').classList.add('open'); document.getElementById('mobile-overlay').classList.add('show'); }
+    function closeMobileNav() { document.getElementById('sidebar').classList.remove('open'); document.getElementById('mobile-overlay').classList.remove('show'); }
+
+    function toggleClarkChat(forceOpen) {
+      const panel = document.getElementById('clark-chat');
+      const open = typeof forceOpen === 'boolean' ? forceOpen : !panel.classList.contains('open');
+      panel.classList.toggle('open', open);
+      document.getElementById('clark-launcher').setAttribute('aria-expanded', String(open));
+      if (open) document.getElementById('chat-input').focus();
+    }
+
+    function addChatMessage(text, isUser) {
+      const message = document.createElement('div'); message.className = `chat-message${isUser ? ' user' : ''}`; message.textContent = text;
+      const messages = document.getElementById('chat-messages'); messages.appendChild(message); messages.scrollTop = messages.scrollHeight; return message;
+    }
+
+    function updateChatControls() {
+      const disabled = state.chatBusy || Boolean(state.pendingChanges);
+      document.getElementById('chat-send').disabled = disabled;
+      document.getElementById('chat-input').disabled = disabled;
+    }
+
+    function showChangePreview(changes) {
+      state.pendingChanges = changes;
+      const preview = document.createElement('div'); preview.className = 'chat-message change-preview';
+      const title = document.createElement('p'); title.className = 'change-title'; title.textContent = 'Review member detail changes';
+      const intro = document.createElement('p'); intro.className = 'change-intro'; intro.textContent = 'No changes have been saved. Confirm to apply or cancel.';
+      const list = document.createElement('ol'); list.className = 'change-list';
+      changes.forEach(change => {
+        const item = document.createElement('li');
+        const label = document.createElement('span'); label.className = 'change-label'; label.textContent = change.label;
+        const values = document.createElement('span'); values.className = 'change-values'; values.textContent = `${change.oldDisplay} → ${change.newDisplay}`;
+        const reason = document.createElement('span'); reason.className = 'change-reason'; reason.textContent = change.reason;
+        item.append(label, values, reason); list.appendChild(item);
+      });
+      const status = document.createElement('p'); status.className = 'change-status';
+      const actions = document.createElement('div'); actions.className = 'change-actions';
+      const confirm = document.createElement('button'); confirm.type = 'button'; confirm.className = 'change-confirm'; confirm.textContent = 'Confirm changes'; confirm.addEventListener('click', event => window.runButtonAction(event.currentTarget, () => confirmChanges(status, actions), 'Saving...'));
+      const cancel = document.createElement('button'); cancel.type = 'button'; cancel.className = 'change-cancel'; cancel.textContent = 'Cancel'; cancel.addEventListener('click', () => cancelChanges(status, actions));
+      actions.append(confirm, cancel); preview.append(title, intro, list, status, actions);
+      const messages = document.getElementById('chat-messages'); messages.appendChild(preview); messages.scrollTop = messages.scrollHeight; updateChatControls();
+    }
+
+    async function confirmChanges(status, actions) {
+      if (!state.pendingChanges || state.chatBusy) return;
+      state.chatBusy = true; status.textContent = 'Saving your confirmed changes...';
+      actions.querySelectorAll('button').forEach(button => { button.disabled = true; }); updateChatControls();
+      try {
+        const result = await apiCall('applyAttendanceChanges', state.pendingChanges);
+        status.textContent = result.message; actions.remove(); state.pendingChanges = null;
+        showToast(result.message, 'success'); await loadDashboard(true);
+      } catch (error) {
+        status.textContent = `Not saved: ${error.message || 'Please try again or cancel.'}`;
+        actions.querySelectorAll('button').forEach(button => { button.disabled = false; });
+      } finally {
+        state.chatBusy = false;
+        updateChatControls();
+      }
+    }
+
+    function cancelChanges(status, actions) {
+      if (state.chatBusy) return;
+      state.pendingChanges = null; status.textContent = 'Canceled. No spreadsheet changes were made.'; actions.remove(); updateChatControls();
+    }
+
+    async function sendClarkMessage(event) {
+      event.preventDefault();
+      const input = document.getElementById('chat-input'); const query = input.value.trim();
+      if (!query || state.chatBusy || state.pendingChanges) return;
+      addChatMessage(query, true); input.value = ''; state.chatBusy = true; updateChatControls();
+      const attendanceRequest = isFastAttendanceChatRequest(query);
+      const loading = addChatMessage(attendanceRequest ? 'Matching names and preparing an attendance preview...' : 'Reviewing workbook data...', false);
+      try {
+        if (attendanceRequest) {
+          const response = await apiCall('suggestFastAttendanceFromText', query, fastAttendanceState.eventId, fastAttendanceState.scheduleId, fastAttendanceState.date);
+          response.entries.forEach(entry => { fastAttendanceState.marks[entry.memberId] = entry.status; });
+          if (response.entries.length) renderAttendeeList();
+          const preview = response.entries.map(entry => `${entry.name}: ${entry.status}`).join('\n');
+          const unmatched = response.unmatched.length ? `\n\nNeeds review or not matched:\n${response.unmatched.join('\n')}` : '';
+          const saveNote = response.entries.length ? '\n\nThese are preview marks only. Review the roster, then click Save Attendance to write them.' : '';
+          loading.textContent = `${response.reply}${preview ? `\n\nAttendance preview:\n${preview}` : ''}${unmatched}${saveNote}`;
+          return;
+        }
+        const response = await apiCall('askAttendanceAI', query, state.chatHistory);
+        loading.textContent = response.reply;
+        state.chatHistory.push({ role: 'user', content: query }, { role: 'assistant', content: response.reply });
+        if (response.changes && response.changes.length) showChangePreview(response.changes);
+      } catch (error) {
+        loading.textContent = `Unable to complete the request: ${error.message || 'Please try again.'}`;
+        console.error('Youth Officers Assistant request error:', error);
+      } finally { state.chatBusy = false; updateChatControls(); }
+    }
+
+    function isFastAttendanceChatRequest(text) {
+      if (state.page !== 'Fast Attendance') return false;
+      const value = String(text || '').trim();
+      if (/\b(present|absent|late|excused|mark attendance|mark everyone|all members)\b/i.test(value) || /[\r\n]/.test(value)) return true;
+      const normalized = value.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+      if (fastAttendanceState.members.some(member => String(member.name || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim() === normalized)) return true;
+      return /[,;]/.test(value) && value.split(/[,;]/).filter(name => name.trim()).length > 1;
+    }
+
+    function updateTheme() {
+      const dark = localStorage.getItem('attendance-dashboard-theme') === 'dark';
+      document.body.classList.toggle('dark-mode', dark);
+      document.getElementById('theme-icon').textContent = dark ? 'light_mode' : 'dark_mode';
+      if (state.data) renderCharts(state.data);
+    }
+
+    function bindEvents() {
+      document.getElementById('apply-range').addEventListener('click', event => window.runButtonAction(event.currentTarget, () => loadDashboard(true), 'Applying...'));
+      document.getElementById('refresh-button').addEventListener('click', event => window.runButtonAction(event.currentTarget, () => loadDashboard(true), 'Refreshing...'));
+      document.getElementById('global-search').addEventListener('input', () => { state.pageIndex = 1; renderMembers(); });
+      ['status-filter', 'category-filter', 'activity-filter'].forEach(id => document.getElementById(id).addEventListener('change', () => { state.pageIndex = 1; renderMembers(); logAction('FILTER_MEMBERS', { filter: id, value: document.getElementById(id).value }); }));
+      document.querySelectorAll('[data-sort]').forEach(button => button.addEventListener('click', () => {
+        const key = button.dataset.sort;
+        state.sortDirection = state.sortKey === key ? state.sortDirection * -1 : 1;
+        state.sortKey = key; renderMembers();
+      }));
+      document.getElementById('export-button').addEventListener('click', exportCsv);
+      document.getElementById('print-button').addEventListener('click', () => { logAction('PRINT_STATISTICS'); window.print(); });
+      document.getElementById('today-present-card').addEventListener('click', () => showGatheringAttendees('Present'));
+      document.getElementById('today-unmarked-card').addEventListener('click', () => showGatheringAttendees('Unmarked'));
+      document.getElementById('today-late-card').addEventListener('click', () => showGatheringAttendees('Late'));
+      document.getElementById('today-absent-card').addEventListener('click', () => showGatheringAttendees('Absent'));
+      document.getElementById('toggle-statistics').addEventListener('click', event => {
+        const content = document.getElementById('statistics-content'); const expanded = event.currentTarget.getAttribute('aria-expanded') === 'true';
+        event.currentTarget.setAttribute('aria-expanded', String(!expanded)); content.hidden = expanded;
+        document.getElementById('statistics-toggle-icon').textContent = expanded ? 'expand_more' : 'expand_less';
+      });
+      document.getElementById('theme-toggle').addEventListener('click', () => {
+        localStorage.setItem('attendance-dashboard-theme', document.body.classList.contains('dark-mode') ? 'light' : 'dark'); updateTheme(); logAction('TOGGLE_THEME');
+      });
+      document.querySelectorAll('.nav-link').forEach(link => link.addEventListener('click', () => navigateTo(link.dataset.page)));
+      document.getElementById('mobile-toggle').addEventListener('click', openMobileNav);
+      document.getElementById('mobile-overlay').addEventListener('click', closeMobileNav);
+      document.getElementById('profile-button').addEventListener('click', () => showToast(document.getElementById('profile-button').title || 'Secretary / Admin'));
+      document.querySelectorAll('[data-close-dialog]').forEach(button => button.addEventListener('click', () => document.getElementById(button.dataset.closeDialog).close()));
+    }
+
+    initializeDateRange();
+    bindEvents();
+    updateTheme();
+    refreshLiveGatheringEvents();
+    renderLiveContext();
+    window.setInterval(renderLiveContext, 1000);
+    window.setInterval(refreshLiveGatheringEvents, 5 * 60 * 1000);
+    window.setInterval(refreshFastAttendanceSchedule, 30 * 1000);
+    window.setInterval(() => {
+      if (state.page === 'Dashboard') loadTodayAttendanceCards(true);
+    }, 60 * 1000);
+    window.setInterval(() => {
+      if (state.page === 'Dashboard') loadDashboard(false, true);
+    }, 5 * 60 * 1000);
+    const savedPage = localStorage.getItem(lastPageStorageKey);
+    const savedPageIsAvailable = Array.from(document.querySelectorAll('.nav-link')).some(link => link.dataset.page === savedPage);
+    navigateTo(savedPageIsAvailable ? savedPage : 'Dashboard');
+        function parseGatheringTime(value) {
+          const text = String(value || '').trim();
+          const match = text.match(/^(\d{1,2})(?::(\d{2}))?(?::\d{2})?\s*(AM|PM)?$/i);
+          if (!match) return null;
+          let hour = Number(match[1]);
+          const minute = Number(match[2] || 0);
+          if (minute > 59) return null;
+          if (match[3]) {
+            if (hour < 1 || hour > 12) return null;
+            if (match[3].toUpperCase() === 'AM' && hour === 12) hour = 0;
+            if (match[3].toUpperCase() === 'PM' && hour < 12) hour += 12;
+          } else if (hour > 23) return null;
+          return { hour: hour, minute: minute };
+        }
+
+        function formatScheduleTime(value) {
+          const parsed = parseGatheringTime(value);
+          if (!parsed) return String(value || '').trim();
+          const date = new Date(2000, 0, 1, parsed.hour, parsed.minute);
+          return new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }).format(date);
+        }
+
+        function formatScheduleName(value) {
+          return String(value || '').trim().replace(/\b(\d{1,2}:\d{2})\s*(AM|PM)?\b/gi, (match, time, suffix) =>
+            formatScheduleTime(suffix ? `${time} ${suffix}` : time));
+        }
+
+        function formatScheduleOption(schedule) {
+          const day = String(schedule.dayOfWeek || '').trim();
+          const name = String(schedule.name || '').trim();
+          const seededName = name.match(/^([A-Za-z]+)\s+\d{1,2}:\d{2}$/);
+          const nameLabel = day && seededName && seededName[1].toLowerCase() === day.toLowerCase()
+            ? ''
+            : formatScheduleName(name);
+          return [nameLabel, day || schedule.date, schedule.time ? formatScheduleTime(schedule.time) : '']
+            .filter(Boolean)
+            .join(' · ') || 'Schedule';
+        }
+
+        function renderLiveContext() {
+          const now = new Date();
+          const compact = window.matchMedia('(max-width: 700px)').matches;
+          document.getElementById('live-clock').textContent = new Intl.DateTimeFormat(undefined, compact
+            ? { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true }
+            : { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true }
+          ).format(now);
+          const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+          const candidates = [];
+          state.gatheringEvents.forEach(event => (event.schedules || []).forEach(schedule => {
+            const day = String(schedule.dayOfWeek || '').toLowerCase().replace(/s$/, '');
+            const dayIndex = dayNames.findIndex(name => name.toLowerCase().replace(/s$/, '') === day);
+            const time = parseGatheringTime(schedule.time);
+            const oneTimeDate = !schedule.dayOfWeek && (schedule.date || event.date);
+            if ((!oneTimeDate && dayIndex < 0) || !time) return;
+            const start = oneTimeDate ? new Date(`${oneTimeDate}T00:00:00`) : new Date(now);
+            if (isNaN(start.getTime())) return;
+            if (!oneTimeDate) {
+              const dayOffset = (dayIndex - now.getDay() + 7) % 7;
+              start.setDate(start.getDate() + dayOffset);
+            }
+            start.setHours(time.hour, time.minute, 0, 0);
+            let end = null;
+            const endTime = parseGatheringTime(schedule.endTime);
+            if (endTime) {
+              end = new Date(start);
+              end.setHours(endTime.hour, endTime.minute, 0, 0);
+              if (end <= start) end.setDate(end.getDate() + 1);
+            } else {
+              end = new Date(start.getTime() + 2 * 60 * 60 * 1000);
+            }
+            if (start <= now && now < end) {
+              candidates.push({ event: event, schedule: schedule, start: start, active: true });
+            } else if (start > now) {
+              candidates.push({ event: event, schedule: schedule, start: start, active: false });
+              if (!oneTimeDate) {
+                const previous = new Date(start);
+                previous.setDate(previous.getDate() - 7);
+                candidates.push({ event: event, schedule: schedule, start: previous, active: false });
+              }
+            } else {
+              candidates.push({ event: event, schedule: schedule, start: start, active: false });
+              if (!oneTimeDate) {
+                const upcoming = new Date(start);
+                upcoming.setDate(upcoming.getDate() + 7);
+                candidates.push({ event: event, schedule: schedule, start: upcoming, active: false });
+              }
+            }
+          }));
+          const current = candidates.filter(item => item.active).sort((a, b) => b.start - a.start)[0];
+          const previous = candidates.filter(item => !item.active && item.start <= now).sort((a, b) => b.start - a.start)[0];
+          const upcoming = candidates.filter(item => item.start > now).sort((a, b) => a.start - b.start)[0];
+          const next = current || previous || upcoming;
+          const title = document.getElementById('live-gathering-title');
+          const detail = document.getElementById('live-gathering-detail');
+          if (!next) {
+            const hadGathering = Boolean(state.liveGathering);
+            state.liveGathering = null;
+            title.textContent = 'No gathering schedule';
+            detail.textContent = 'Add or edit gatherings in Weekly Schedule';
+            if (hadGathering && state.page === 'Dashboard') loadTodayAttendanceCards(true);
+            else if (state.page === 'Dashboard' && state.gatheringEvents.length) loadTodayAttendanceCards();
+            return;
+          }
+          const schedule = next.schedule;
+          const started = next.start <= now;
+          const contextChanged = !state.liveGathering ||
+            state.liveGathering.eventId !== next.event.eventId ||
+            state.liveGathering.scheduleId !== schedule.scheduleId ||
+            state.liveGathering.date !== dateInputValue(next.start) ||
+            state.liveGathering.started !== started;
+          state.liveGathering = {
+            eventId: next.event.eventId,
+            eventName: next.event.name,
+            scheduleId: schedule.scheduleId,
+            scheduleName: schedule.name,
+            scheduleTime: formatScheduleTime(schedule.time),
+            date: dateInputValue(next.start),
+            active: Boolean(current),
+            started: started
+          };
+          if (state.page === 'Dashboard' && contextChanged) loadTodayAttendanceCards();
+          const parsedDisplayTime = parseGatheringTime(schedule.time);
+          const time = parsedDisplayTime ? new Date(2000, 0, 1, parsedDisplayTime.hour, parsedDisplayTime.minute) : null;
+          const displayTime = time ? formatScheduleTime(schedule.time) : schedule.time;
+          const prefix = compact
+            ? current ? 'Now' : started ? `Last ${dayNames[next.start.getDay()].slice(0, 3)}` : `Next ${dayNames[next.start.getDay()].slice(0, 3)}`
+            : current ? 'Happening now' : started ? `Last · ${dayNames[next.start.getDay()]}` : `Next · ${dayNames[next.start.getDay()]}`;
+          title.textContent = `${prefix}: ${next.event.name}${compact && displayTime ? ` · ${displayTime}` : ''}`;
+          detail.textContent = [displayTime, schedule.mproIncharge ? `MPRO: ${schedule.mproIncharge}` : ''].filter(Boolean).join(' · ');
+        }
+
+        async function refreshLiveGatheringEvents() {
+          try {
+            state.gatheringEvents = await apiCall('getAttendanceEvents');
+            renderLiveContext();
+          } catch (error) {
+            document.getElementById('live-gathering-title').textContent = 'Schedule unavailable';
+            document.getElementById('live-gathering-detail').textContent = error.message || 'Check the schedule sheet';
+          }
+        }
+    loadDashboard(false);
+  </script>
+</body>
+</html>

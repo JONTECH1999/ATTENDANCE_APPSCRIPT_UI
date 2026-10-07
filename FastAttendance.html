@@ -1,0 +1,268 @@
+<section id="fast-attendance-page" class="module-view" hidden>
+  <div class="module-titlebar"><div><p class="eyebrow">Check-in desk</p><h2>Fast Attendance</h2><p class="module-caption">Mark members for an event and schedule</p></div></div>
+  <details id="attendance-event-program" class="attendance-event-program" hidden><summary>View event program</summary><pre id="attendance-event-program-text"></pre></details>
+  <section class="module-panel fast-selector">
+    <div class="attendance-selector-grid">
+      <label><span class="step-label">1. Select Event</span><select id="attendance-event-select" class="module-select wide-select"></select><small id="selected-event-date"></small></label>
+      <label><span class="step-label">2. Select Schedule &amp; Date</span><select id="attendance-schedule-select" class="module-select wide-select"></select><small id="selected-schedule-info"></small></label>
+      <div class="attendance-save-actions"><button id="save-attendance-button" class="module-button save-attendance" type="button"><span class="material-symbols-rounded">save</span>Save Attendance</button><button id="attendance-special-button" class="module-button" type="button"><span class="material-symbols-rounded">add</span>Add Special Schedule</button></div>
+    </div>
+    <div class="attendee-stats">
+      <div class="attendance-count present-count"><span>Present</span><strong id="count-present">0</strong></div>
+      <div class="attendance-count absent-count"><span>Absent</span><strong id="count-absent">0</strong></div>
+      <div class="attendance-count late-count"><span>Late</span><strong id="count-late">0</strong></div>
+      <div class="attendance-count excused-count"><span>Excused</span><strong id="count-excused">0</strong></div>
+      <div class="attendance-count unmarked-count"><span>Unmarked</span><strong id="count-unmarked">0</strong></div>
+    </div>
+  </section>
+  <section class="module-panel fast-tools-panel">
+    <div class="fast-search-row">
+      <label class="module-search"><span class="material-symbols-rounded">search</span><input id="attendance-member-search" type="search" placeholder="Search member by full name, Member ID, or contact number..."></label>
+      <select id="attendance-category-filter" class="module-select"><option value="">All Categories</option><option>Junior</option><option>Senior</option></select>
+      <select id="attendance-status-filter" class="module-select"><option value="">All Statuses</option><option>Active</option><option>Inactive</option><option>On &amp; Off</option></select>
+      <select id="attendance-committee-filter" class="module-select"><option value="">All Committees</option></select>
+    </div>
+    <div class="fast-bulk-row"><div><button id="mark-filtered-present" class="module-button success-outline" type="button"><span class="material-symbols-rounded">check</span>Mark All Filtered Present</button><button id="mark-unmarked-absent" class="module-button danger-outline" type="button"><span class="material-symbols-rounded">cancel</span>Mark Unmarked Absent</button><button id="clear-attendance-selection" class="module-button" type="button"><span class="material-symbols-rounded">delete_sweep</span>Clear Selection</button></div><span id="fast-member-count" class="filter-count"></span></div>
+  </section>
+  <section class="module-panel attendee-list-panel"><div id="attendee-list" class="attendee-list"><div class="module-empty">Loading attendance roster...</div></div></section>
+</section>
+
+<dialog id="special-schedule-dialog" class="module-dialog">
+  <form id="special-schedule-form" method="dialog">
+    <div class="dialog-heading"><div><p class="eyebrow">One-time service</p><h2>Add Special Schedule</h2></div><button class="icon-button" type="button" data-close-dialog="special-schedule-dialog" aria-label="Close"><span class="material-symbols-rounded">close</span></button></div>
+    <div class="form-grid"><label>Schedule name<input name="name" required maxlength="100" placeholder="Special meeting"></label><label>Date<input name="date" type="date" required></label><label>Start time<input name="time" type="text" inputmode="text" autocomplete="off" placeholder="3:30 AM"><small>Enter time with AM or PM, e.g. 7:00 PM.</small></label><label>End time<input name="endTime" type="text" inputmode="text" autocomplete="off" placeholder="5:30 AM"><small>Enter time with AM or PM.</small></label><label class="form-wide">Location<input name="location" maxlength="160"></label></div>
+    <div class="dialog-actions"><button class="module-button" type="button" data-close-dialog="special-schedule-dialog">Cancel</button><button class="module-button primary" type="submit">Add Schedule</button></div>
+  </form>
+</dialog>
+
+<script>
+  const fastAttendanceState = { members: [], events: [], records: [], marks: Object.create(null), eventId: '', scheduleId: '', date: '', requestedDate: '', scheduleWasManuallySelected: false };
+
+  async function loadFastAttendance() {
+    if (state.page !== 'Fast Attendance') return;
+    try {
+      const today = dateInputValue(new Date());
+      const result = await apiCall('getFastAttendanceData', fastAttendanceState.date || today);
+      fastAttendanceState.members = result.members;
+      fastAttendanceState.events = result.events;
+      fastAttendanceState.records = result.records;
+      renderAttendanceEventOptions();
+      renderAttendeeList();
+      state.loadedPages['Fast Attendance'] = true;
+    } catch (error) { showToast(error.message || 'Unable to load attendance data.', 'error'); }
+  }
+
+  function renderAttendanceEventOptions() {
+    const select = document.getElementById('attendance-event-select'); const previous = fastAttendanceState.eventId;
+    select.replaceChildren(new Option('Select an event...', ''));
+    fastAttendanceState.events.forEach(event => select.add(new Option(`${event.name}${event.category ? ` (${event.category})` : ''}`, event.eventId)));
+    fastAttendanceState.eventId = fastAttendanceState.events.some(event => event.eventId === previous) ? previous : (fastAttendanceState.events[0] || {}).eventId || '';
+    select.value = fastAttendanceState.eventId;
+    renderAttendanceSchedules();
+  }
+
+  function currentAttendanceEvent() { return fastAttendanceState.events.find(event => event.eventId === fastAttendanceState.eventId); }
+
+  function renderAttendanceSchedules() {
+    const event = currentAttendanceEvent(); const select = document.getElementById('attendance-schedule-select'); const previous = fastAttendanceState.scheduleId;
+    const program = document.getElementById('attendance-event-program');
+    program.hidden = !event || !event.program;
+    document.getElementById('attendance-event-program-text').textContent = event && event.program || '';
+    select.replaceChildren(new Option(event ? 'Select a schedule...' : 'Choose an event first', ''));
+    if (event) event.schedules.forEach(schedule => select.add(new Option(formatScheduleOption(schedule), schedule.scheduleId)));
+    const hasPrevious = event && event.schedules.some(schedule => String(schedule.scheduleId) === String(previous));
+    const preservePrevious = Boolean(hasPrevious && fastAttendanceState.scheduleWasManuallySelected);
+    const defaultOccurrence = event && !preservePrevious ? lastAttendanceSchedule(event, new Date()) : null;
+    fastAttendanceState.scheduleId = preservePrevious
+      ? previous
+      : defaultOccurrence
+        ? String(defaultOccurrence.schedule.scheduleId)
+        : event && event.schedules[0]
+          ? String(event.schedules[0].scheduleId)
+          : '';
+    select.value = fastAttendanceState.scheduleId;
+    const chosen = event && event.schedules.find(schedule => String(schedule.scheduleId) === String(fastAttendanceState.scheduleId));
+    const occurrence = chosen && fastAttendanceState.requestedDate
+      ? { start: new Date(`${fastAttendanceState.requestedDate}T12:00:00`) }
+      : chosen && defaultOccurrence && String(chosen.scheduleId) === String(defaultOccurrence.schedule.scheduleId)
+      ? defaultOccurrence
+      : chosen && getAttendanceScheduleOccurrence(event, chosen, new Date(), 'nearest');
+    fastAttendanceState.date = occurrence
+      ? dateInputValue(occurrence.start)
+      : (chosen && chosen.date) || (event && event.date) || dateInputValue(new Date());
+    fastAttendanceState.requestedDate = '';
+    updateAttendanceScheduleDetails(event, chosen);
+    loadExistingAttendance();
+  }
+
+  function updateAttendanceScheduleDetails(event, schedule) {
+    document.getElementById('selected-event-date').textContent = event
+      ? `${fastAttendanceState.date || event.date}${event.location ? ` • ${event.location}` : ''}`
+      : '';
+    document.getElementById('selected-schedule-info').textContent = schedule
+      ? `${schedule.dayOfWeek ? `Repeats: ${schedule.dayOfWeek}` : `Date: ${schedule.date || event.date || 'Not set'}`}${schedule.time ? ` • Time: ${formatScheduleTime(schedule.time)}` : ''}${schedule.mproIncharge ? ` • MPRO: ${schedule.mproIncharge}` : ''}${schedule.officersAssigned ? ` • Officers: ${schedule.officersAssigned}` : ''}${schedule.location ? ` • Location: ${schedule.location}` : ''}`
+      : 'No schedule is attached to this event.';
+  }
+
+  function getAttendanceScheduleOccurrence(event, schedule, now, mode) {
+    const time = parseGatheringTime(schedule.time);
+    if (!time) return null;
+    const weekdays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const scheduleDay = String(schedule.dayOfWeek || '').trim().toLowerCase();
+    const weekdayIndex = weekdays.findIndex(day => day.toLowerCase() === scheduleDay || day.slice(0, 3).toLowerCase() === scheduleDay);
+    const recurring = weekdayIndex >= 0;
+    let previous = null;
+    let next = null;
+    if (recurring) {
+      const daysSince = (now.getDay() - weekdayIndex + 7) % 7;
+      previous = new Date(now.getFullYear(), now.getMonth(), now.getDate() - daysSince, time.hour, time.minute);
+      if (previous > now) previous.setDate(previous.getDate() - 7);
+      next = new Date(previous);
+      next.setDate(next.getDate() + 7);
+    } else {
+      const date = String(schedule.date || event.date || '').slice(0, 10);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
+      const start = new Date(`${date}T00:00:00`);
+      if (isNaN(start.getTime())) return null;
+      start.setHours(time.hour, time.minute, 0, 0);
+      if (start <= now) previous = start;
+      else next = start;
+    }
+
+    if (mode === 'last') return previous ? { start: previous } : next ? { start: next } : null;
+    if (!previous) return next ? { start: next } : null;
+    if (!next) return { start: previous };
+    const previousDistance = now.getTime() - previous.getTime();
+    const nextDistance = next.getTime() - now.getTime();
+    return { start: previousDistance <= nextDistance ? previous : next };
+  }
+
+  function lastAttendanceSchedule(event, now) {
+    const occurrences = (event.schedules || []).map(schedule => {
+      const occurrence = getAttendanceScheduleOccurrence(event, schedule, now, 'last');
+      return occurrence ? { schedule: schedule, start: occurrence.start } : null;
+    }).filter(Boolean);
+    const previous = occurrences.filter(item => item.start <= now).sort((first, second) => second.start - first.start)[0];
+    return previous || occurrences.sort((first, second) => first.start - second.start)[0] || null;
+  }
+
+  function refreshFastAttendanceSchedule() {
+    if (state.page !== 'Fast Attendance' || fastAttendanceState.scheduleWasManuallySelected) return;
+    const event = currentAttendanceEvent();
+    const occurrence = event && lastAttendanceSchedule(event, new Date());
+    if (!occurrence) return;
+    const scheduleId = String(occurrence.schedule.scheduleId);
+    const date = dateInputValue(occurrence.start);
+    if (scheduleId === String(fastAttendanceState.scheduleId) && date === fastAttendanceState.date) return;
+    fastAttendanceState.scheduleId = scheduleId;
+    fastAttendanceState.date = date;
+    document.getElementById('attendance-schedule-select').value = scheduleId;
+    updateAttendanceScheduleDetails(event, occurrence.schedule);
+    loadExistingAttendance();
+  }
+
+  async function loadExistingAttendance() {
+    fastAttendanceState.marks = Object.create(null);
+    if (!fastAttendanceState.date) { renderAttendeeList(); return; }
+    try {
+      fastAttendanceState.records = await apiCall('getAttendanceRecords', fastAttendanceState.date, fastAttendanceState.date);
+      fastAttendanceState.records.filter(record => record.eventId === fastAttendanceState.eventId && String(record.scheduleId) === String(fastAttendanceState.scheduleId)).forEach(record => { fastAttendanceState.marks[record.memberId] = record.status; });
+      renderAttendeeList();
+    } catch (error) { showToast(error.message || 'Unable to load saved attendance.', 'error'); }
+  }
+
+  function filteredAttendees() {
+    const query = String(document.getElementById('attendance-member-search').value || '').trim().toLowerCase();
+    const category = String(document.getElementById('attendance-category-filter').value || '').trim().toLowerCase();
+    const status = String(document.getElementById('attendance-status-filter').value || '').trim().toLowerCase();
+    const committee = String(document.getElementById('attendance-committee-filter').value || '').trim().toLowerCase();
+    return fastAttendanceState.members.filter(member => {
+      const searchable = `${member.memberId || ''} ${member.name || ''} ${member.contactNumber || ''}`.toLowerCase();
+      const memberCategory = String(member.category || '').toLowerCase();
+      const memberStatus = String(member.membershipStatus || '').toLowerCase();
+      const memberCommittees = String(member.committees || '').split(/[,;]+/).map(value => value.trim().toLowerCase()).filter(Boolean);
+      return searchable.includes(query) &&
+        (!category || memberCategory === category) &&
+        (!status || memberStatus === status) &&
+        (!committee || memberCommittees.includes(committee));
+    });
+  }
+
+  function renderAttendeeList() {
+    const rows = filteredAttendees(); const list = document.getElementById('attendee-list'); list.replaceChildren();
+    const totals = { Present: 0, Absent: 0, Late: 0, Excused: 0, Unmarked: 0 };
+    fastAttendanceState.members.forEach(member => {
+      const status = fastAttendanceState.marks[member.memberId];
+      if (status && totals[status] !== undefined) totals[status] += 1;
+      else totals.Unmarked += 1;
+    });
+    Object.keys(totals).forEach(status => document.getElementById(`count-${status.toLowerCase()}`).textContent = formatNumber(totals[status]));
+    document.getElementById('fast-member-count').textContent = `Showing ${formatNumber(rows.length)} member(s)`;
+    if (!rows.length) { list.innerHTML = '<div class="module-empty">No members match these filters.</div>'; return; }
+    rows.forEach(member => {
+      const row = document.createElement('article'); row.className = 'attendee-row';
+      const initials = document.createElement('span'); initials.className = 'attendee-avatar'; initials.textContent = (member.name || member.memberId || 'N').split(/\s+/).map(value => value[0]).slice(0, 2).join('').toUpperCase();
+      const info = document.createElement('div'); info.className = 'attendee-info';
+      const name = document.createElement('strong'); name.textContent = member.name || 'Name not recorded';
+      const meta = document.createElement('div'); meta.className = 'attendee-meta';
+      const details = [
+        [member.memberId, 'id'],
+        [member.category, 'category'],
+        [member.membershipStatus, 'status'],
+        [member.contactNumber, 'contact'],
+        [member.committees, 'committee']
+      ].filter(item => Boolean(item[0]));
+      details.forEach(([value, kind]) => { const span = document.createElement('span'); span.className = `attendee-meta-${kind}`; span.textContent = String(value); meta.appendChild(span); });
+      const rate = document.createElement('span'); rate.className = 'attendee-rate'; rate.textContent = `Rate: ${formatPercent(member.attendancePercent, 0)}`; meta.appendChild(rate); info.append(name, meta);
+      const controls = document.createElement('div'); controls.className = 'attendance-status-buttons';
+      [['Present','check_circle'],['Absent','cancel'],['Late','schedule'],['Excused','help']].forEach(([status, icon]) => {
+        const button = document.createElement('button'); button.type = 'button'; button.className = `status-choice${fastAttendanceState.marks[member.memberId] === status ? ' selected' : ''}`; button.title = status; button.setAttribute('aria-label', `${status}: ${member.name || member.memberId}`);
+        const glyph = document.createElement('span'); glyph.className = 'material-symbols-rounded'; glyph.textContent = icon; button.append(glyph, document.createTextNode(status.toUpperCase())); button.addEventListener('click', () => { fastAttendanceState.marks[member.memberId] = status; renderAttendeeList(); }); controls.appendChild(button);
+      });
+      row.append(initials, info, controls); list.appendChild(row);
+    });
+    const committeeSelect = document.getElementById('attendance-committee-filter');
+    const selected = committeeSelect.value;
+    const committees = [...new Set(fastAttendanceState.members.flatMap(member => String(member.committees || '').split(/[,;]+/).map(value => value.trim()).filter(Boolean)))].sort();
+    committeeSelect.replaceChildren(new Option('All Committees', ''));
+    committees.forEach(value => committeeSelect.add(new Option(value, value.toLowerCase())));
+    committeeSelect.value = selected;
+  }
+
+  async function saveAttendanceSelection(button) {
+    if (!fastAttendanceState.eventId || !fastAttendanceState.scheduleId) { showToast('Select an event and schedule first.', 'error'); return; }
+    const entries=Object.keys(fastAttendanceState.marks).map(memberId=>({memberId,status:fastAttendanceState.marks[memberId]}));
+    if (!entries.length) { showToast('Mark at least one member before saving.', 'error'); return; }
+    await window.runButtonAction(button, async () => {
+      try { const result=await apiCall('saveFastAttendance',fastAttendanceState.eventId,fastAttendanceState.scheduleId,fastAttendanceState.date,entries);showToast(result.message,'success');await loadFastAttendance(); }
+      catch(error){showToast(error.message||'Unable to save attendance.','error');}
+    }, 'Saving...');
+  }
+
+  function openSpecialSchedule() {
+    if (!fastAttendanceState.eventId) { showToast('Select an event first.', 'error'); return; }
+    const form=document.getElementById('special-schedule-form');form.reset();form.dataset.eventId=fastAttendanceState.eventId;form.elements.date.value=fastAttendanceState.date||dateInputValue(new Date());document.getElementById('special-schedule-dialog').showModal();
+  }
+
+  async function submitSpecialSchedule(event) {
+    event.preventDefault();const form=event.currentTarget;const payload=Object.fromEntries(new FormData(form).entries());payload.eventId=form.dataset.eventId;
+    const button=event.submitter||form.querySelector('[type="submit"]');
+    await window.runButtonAction(button, async()=>{
+      try{const result=await apiCall('addAttendanceSchedule',payload);document.getElementById('special-schedule-dialog').close();showToast(result.message,'success');await loadFastAttendance();}
+      catch(error){showToast(error.message||'Unable to add schedule.','error');}
+    }, 'Adding...');
+  }
+
+  function bindFastAttendancePage() {
+    document.getElementById('attendance-event-select').addEventListener('change',event=>{fastAttendanceState.eventId=event.target.value;fastAttendanceState.scheduleId='';fastAttendanceState.scheduleWasManuallySelected=false;renderAttendanceSchedules();});
+    document.getElementById('attendance-schedule-select').addEventListener('change',event=>{fastAttendanceState.scheduleId=event.target.value;fastAttendanceState.scheduleWasManuallySelected=true;renderAttendanceSchedules();});
+    ['attendance-member-search','attendance-category-filter','attendance-status-filter','attendance-committee-filter'].forEach(id=>document.getElementById(id).addEventListener(id.includes('search')?'input':'change',renderAttendeeList));
+    document.getElementById('save-attendance-button').addEventListener('click',event=>saveAttendanceSelection(event.currentTarget));
+    document.getElementById('attendance-special-button').addEventListener('click',openSpecialSchedule);
+    document.getElementById('special-schedule-form').addEventListener('submit',submitSpecialSchedule);
+    document.getElementById('mark-filtered-present').addEventListener('click',()=>{filteredAttendees().forEach(member=>{fastAttendanceState.marks[member.memberId]='Present';});renderAttendeeList();});
+    document.getElementById('mark-unmarked-absent').addEventListener('click',()=>{filteredAttendees().forEach(member=>{if(!fastAttendanceState.marks[member.memberId])fastAttendanceState.marks[member.memberId]='Absent';});renderAttendeeList();});
+    document.getElementById('clear-attendance-selection').addEventListener('click',()=>{fastAttendanceState.marks=Object.create(null);renderAttendeeList();});
+  }
+  bindFastAttendancePage();
+</script>

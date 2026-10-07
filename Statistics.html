@@ -1,0 +1,97 @@
+<section id="statistics-page-module" class="module-view" hidden>
+  <style>
+    .statistics-report-shell {
+      background: var(--surface); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow); overflow: hidden;
+    }
+    .statistics-report-header {
+      display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 18px; background: #0f172a; color: white; border-bottom: 1px solid rgba(255,255,255,.12);
+    }
+    .statistics-report-header h3 { margin: 0; font: 800 15px "Manrope", sans-serif; }
+    .statistics-report-header .badge-inline { display: inline-flex; align-items: center; justify-content: center; min-height: 28px; padding: 0 12px; color: white; background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.18); border-radius: 999px; font-size: 9px; font-weight: 700; }
+    .statistics-report-grid { display: grid; gap: 10px; padding: 0; }
+    .statistics-table-wrap { overflow: auto; }
+    .statistics-report-table { width: 100%; min-width: 820px; border-collapse: collapse; }
+    .statistics-report-table thead th {
+      padding: 12px 10px; background: rgba(255,255,255,.04); color: #dfe8f8; border-bottom: 1px solid rgba(255,255,255,.12); font-size: 9px; letter-spacing: .08em; text-transform: uppercase;
+    }
+    .statistics-report-table tbody td {
+      padding: 10px 10px; background: transparent; color: var(--ink); font-size: 11px; border-bottom: 1px solid var(--line);
+    }
+    .statistics-report-table tbody tr:nth-child(even) { background: rgba(148,163,184,.03); }
+    .statistics-report-table .legend-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 8px; vertical-align: middle; }
+    .legend-success { background: #1dbf73; }
+    .legend-warning { background: #e3a41d; }
+    .legend-danger { background: #d82148; }
+    .legend-purple { background: #8b5cf6; }
+    .legend-blue { background: #2b63c7; }
+    .statistics-total-row td { background: rgba(37,99,235,.06); font-weight: 800; }
+    .statistics-signoff {
+      display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; padding: 14px 18px 18px; border-top: 1px solid var(--line);
+    }
+    .statistics-signoff-box { padding-top: 14px; border-top: 1px solid var(--line); }
+    .statistics-signoff-box strong { display: block; text-transform: uppercase; font-size: 11px; }
+    .statistics-signoff-box span { display: block; margin-top: 8px; color: var(--muted); font-size: 9px; letter-spacing: .08em; }
+    @media (max-width: 700px) {
+      .statistics-signoff { grid-template-columns: 1fr; }
+      .statistics-report-header { flex-direction: column; align-items: flex-start; }
+    }
+  </style>
+
+  <div class="statistics-report-shell">
+    <div class="statistics-report-header">
+      <h3>MEMBERSHIP_STATISTICS_OFFICIAL_REPORT</h3>
+      <span class="badge-inline">Total Registered: 64</span>
+    </div>
+
+    <div class="statistics-report-grid">
+      <div class="statistics-table-wrap">
+        <table class="statistics-report-table">
+          <thead>
+            <tr>
+              <th>Membership Category / Breakdown</th>
+              <th>Junior (&lt; 18)</th>
+              <th>Senior (18+)</th>
+              <th>Total Count</th>
+              <th>Percentage of Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><span class="legend-dot legend-success"></span>Active Members</td>
+              <td>46</td><td>13</td><td><strong>59</strong></td><td class="legend-success"><strong>92.2%</strong></td>
+            </tr>
+            <tr>
+              <td><span class="legend-dot legend-warning"></span>On &amp; Off Members</td>
+              <td>2</td><td>0</td><td><strong>2</strong></td><td class="legend-warning"><strong>3.1%</strong></td>
+            </tr>
+            <tr>
+              <td><span class="legend-dot legend-danger"></span>Inactive Members</td>
+              <td>2</td><td>0</td><td><strong>2</strong></td><td class="legend-danger"><strong>3.1%</strong></td>
+            </tr>
+            <tr>
+              <td><span class="legend-dot legend-purple"></span>Suspended Total</td>
+              <td>0</td><td>0</td><td><strong>0</strong></td><td class="legend-purple"><strong>0%</strong></td>
+            </tr>
+            <tr>
+              <td><span class="legend-dot legend-blue"></span>Missing Members</td>
+              <td>0</td><td>0</td><td><strong>0</strong></td><td class="legend-blue"><strong>0%</strong></td>
+            </tr>
+            <tr class="statistics-total-row">
+              <td><strong>TOTAL REGISTERED MEMBERS</strong></td>
+              <td><strong>50</strong></td>
+              <td><strong>13</strong></td>
+              <td><strong>64</strong></td>
+              <td><strong>100.0%</strong></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="statistics-signoff">
+      <div class="statistics-signoff-box"><strong>Your Full Name</strong><span>Prepared by (Youth Officer)</span></div>
+      <div class="statistics-signoff-box"><strong>Ascoville Youth Committee</strong><span>Reviewed by (Core Group)</span></div>
+      <div class="statistics-signoff-box"><strong>Assigned Worker</strong><span>Noted / Approved by</span></div>
+    </div>
+  </div>
+</section>

@@ -1,0 +1,134 @@
+<section id="special-events-page" class="module-view" hidden>
+  <div class="module-titlebar">
+    <div><p class="eyebrow">One-time gatherings</p><h2>Special Events</h2><p id="special-event-count" class="module-caption">Loading special events...</p></div>
+    <button id="create-special-event-button" class="module-button primary" type="button"><span class="material-symbols-rounded">add</span>Create Special Event</button>
+  </div>
+  <div id="special-event-list" class="special-event-list"><section class="module-panel module-empty">Loading special events...</section></div>
+</section>
+
+<dialog id="special-event-dialog" class="module-dialog">
+  <form id="special-event-form" method="dialog">
+    <div class="dialog-heading"><div><p class="eyebrow">Event details</p><h2>Create Special Event</h2></div><button class="icon-button" type="button" data-close-dialog="special-event-dialog" aria-label="Close"><span class="material-symbols-rounded">close</span></button></div>
+    <div class="form-grid">
+      <label class="form-wide">Event name<input name="name" required maxlength="160" placeholder="Youth fellowship day"></label>
+      <label>Date<input name="date" type="date" required></label>
+      <label>Start time<input name="time" type="text" inputmode="text" autocomplete="off" placeholder="3:30 AM" required><small>Enter time with AM or PM, e.g. 7:00 PM.</small></label>
+      <label>End time<input name="endTime" type="text" inputmode="text" autocomplete="off" placeholder="5:30 AM"><small>Enter time with AM or PM.</small></label>
+      <label>Location<input name="location" maxlength="160" placeholder="Venue"></label>
+      <label class="form-wide">Description<input name="description" maxlength="500" placeholder="Purpose or event notes"></label>
+      <label class="form-wide">Program / Agenda<textarea name="program" rows="7" required maxlength="10000" placeholder="Add one program item per line, with time and person in charge when available."></textarea></label>
+    </div>
+    <p class="module-help">The event is added to Weekly Schedule and Fast Attendance. Attendance is saved only when you use Save Attendance.</p>
+    <div class="dialog-actions"><button class="module-button" type="button" data-close-dialog="special-event-dialog">Cancel</button><button id="save-special-event-button" class="module-button primary" type="submit">Create Event</button></div>
+  </form>
+</dialog>
+
+<script>
+  const specialEventsState = { events: [] };
+
+  async function loadSpecialEvents() {
+    if (state.page !== 'Special Events') return;
+    try {
+      specialEventsState.events = await apiCall('getSpecialEvents');
+      renderSpecialEvents();
+      state.loadedPages['Special Events'] = true;
+    } catch (error) {
+      showToast(error.message || 'Unable to load special events.', 'error');
+    }
+  }
+
+  function renderSpecialEvents() {
+    const list = document.getElementById('special-event-list');
+    list.replaceChildren();
+    const events = specialEventsState.events;
+    document.getElementById('special-event-count').textContent = `${formatNumber(events.length)} special event(s)`;
+    if (!events.length) {
+      const empty = document.createElement('section');
+      empty.className = 'module-panel module-empty';
+      empty.textContent = 'No special events yet. Create one to add its program and attendance schedule.';
+      list.appendChild(empty);
+      return;
+    }
+    events.forEach(event => {
+      const card = document.createElement('article');
+      card.className = 'module-panel special-event-card';
+      const header = document.createElement('div');
+      header.className = 'special-event-card-header';
+      const titleGroup = document.createElement('div');
+      const title = document.createElement('h3');
+      title.textContent = event.name;
+      const details = document.createElement('p');
+      const schedule = (event.schedules || [])[0] || {};
+      details.textContent = [schedule.date || event.date, schedule.time ? formatScheduleTime(schedule.time) : '', schedule.location || event.location].filter(Boolean).join(' · ') || 'Date and time not set';
+      titleGroup.append(title, details);
+      const badge = makeBadge(event.status || 'Scheduled', 'quiet');
+      header.append(titleGroup, badge);
+      const body = document.createElement('div');
+      body.className = 'special-event-card-body';
+      const description = document.createElement('p');
+      description.className = 'special-event-description';
+      description.textContent = event.description || 'No description added.';
+      const programLabel = document.createElement('h4');
+      programLabel.textContent = 'Program';
+      const program = document.createElement('pre');
+      program.className = 'special-event-program';
+      program.textContent = event.program || 'No program added.';
+      const actions = document.createElement('div');
+      actions.className = 'special-event-actions';
+      const attendance = document.createElement('button');
+      attendance.type = 'button';
+      attendance.className = 'module-button primary';
+      attendance.innerHTML = '<span class="material-symbols-rounded">how_to_reg</span>Take Attendance';
+      attendance.addEventListener('click', () => {
+        if (!schedule.scheduleId) { showToast('This event has no attendance schedule.', 'error'); return; }
+        fastAttendanceState.eventId = event.eventId;
+        fastAttendanceState.scheduleId = schedule.scheduleId;
+        fastAttendanceState.date = schedule.date || event.date;
+        navigateTo('Fast Attendance');
+      });
+      actions.appendChild(attendance);
+      const eventDate = schedule.date || event.date;
+      if (eventDate && eventDate < dateInputValue(new Date())) {
+        const history = document.createElement('button');
+        history.type = 'button';
+        history.className = 'module-button';
+        history.innerHTML = '<span class="material-symbols-rounded">history</span>View History';
+        history.addEventListener('click', () => {
+          openEventHistoryRecord({ eventId: event.eventId, scheduleId: schedule.scheduleId || '', eventDate: eventDate });
+        });
+        actions.appendChild(history);
+      }
+      body.append(description, programLabel, program, actions);
+      card.append(header, body);
+      list.appendChild(card);
+    });
+  }
+
+  function openSpecialEventDialog() {
+    const form = document.getElementById('special-event-form');
+    form.reset();
+    form.elements.date.value = dateInputValue(new Date());
+    document.getElementById('special-event-dialog').showModal();
+  }
+
+  async function submitSpecialEvent(event) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const button = document.getElementById('save-special-event-button');
+    const data = Object.fromEntries(new FormData(form).entries());
+    await window.runButtonAction(button, async () => {
+      try {
+        const result = await apiCall('createSpecialEvent', data);
+        document.getElementById('special-event-dialog').close();
+        showToast(result.message, 'success');
+        await loadSpecialEvents();
+        refreshLiveGatheringEvents();
+      } catch (error) {
+        showToast(error.message || 'Unable to create special event.', 'error');
+      }
+    }, 'Creating...');
+  }
+
+  document.getElementById('create-special-event-button').addEventListener('click', openSpecialEventDialog);
+  document.getElementById('special-event-form').addEventListener('submit', submitSpecialEvent);
+</script>

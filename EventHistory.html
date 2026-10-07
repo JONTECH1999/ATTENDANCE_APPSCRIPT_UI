@@ -1,0 +1,184 @@
+<section id="event-history-page" class="module-view" hidden>
+  <div class="module-titlebar">
+    <div><p class="eyebrow">Saved attendance records</p><h2>Event History</h2><p class="module-caption">Read-only event details and attendance. Member profile fields show their current values.</p></div>
+    <button id="refresh-event-history" class="module-button" type="button"><span class="material-symbols-rounded">refresh</span>Refresh History</button>
+  </div>
+  <div class="event-history-layout">
+    <section class="module-panel event-history-list-panel">
+      <div class="event-history-list-heading"><h3>Past Events</h3><span id="event-history-count" class="filter-count"></span></div>
+      <div id="event-history-list" class="event-history-list"><div class="module-empty">Loading event history...</div></div>
+    </section>
+    <section id="event-history-detail" class="module-panel event-history-detail">
+      <div class="module-empty">Choose a past event to view its program and attendees.</div>
+    </section>
+  </div>
+</section>
+
+<script>
+  const eventHistoryState = { occurrences: [], selectedKey: '', pendingSelection: null };
+
+  async function loadEventHistory() {
+    if (state.page !== 'Event History') return;
+    try {
+      eventHistoryState.occurrences = await apiCall('getEventHistory');
+      renderEventHistoryList();
+      const requested = eventHistoryState.pendingSelection;
+      eventHistoryState.pendingSelection = null;
+      const requestedItem = requested && eventHistoryState.occurrences.find(item =>
+        item.eventId === requested.eventId && String(item.scheduleId) === String(requested.scheduleId) && item.eventDate === requested.eventDate);
+      const selected = requestedItem || eventHistoryState.occurrences.find(item => item.key === eventHistoryState.selectedKey) || eventHistoryState.occurrences[0];
+      if (selected) await selectEventHistory(selected.key);
+      else renderEmptyEventHistory();
+      state.loadedPages['Event History'] = true;
+    } catch (error) {
+      showToast(error.message || 'Unable to load event history.', 'error');
+    }
+  }
+
+  function renderEventHistoryList() {
+    const list = document.getElementById('event-history-list');
+    list.replaceChildren();
+    document.getElementById('event-history-count').textContent = `${formatNumber(eventHistoryState.occurrences.length)} record(s)`;
+    if (!eventHistoryState.occurrences.length) {
+      const empty = document.createElement('div');
+      empty.className = 'module-empty';
+      empty.textContent = 'No past events have attendance records yet.';
+      list.appendChild(empty);
+      return;
+    }
+    eventHistoryState.occurrences.forEach(item => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = `event-history-item${item.key === eventHistoryState.selectedKey ? ' selected' : ''}`;
+      button.setAttribute('aria-pressed', String(item.key === eventHistoryState.selectedKey));
+      const title = document.createElement('strong');
+      title.textContent = item.eventName;
+      const subtitle = document.createElement('span');
+      subtitle.textContent = `${item.eventDate} · ${formatScheduleName(item.scheduleName)}${item.time ? ` · ${formatScheduleTime(item.time)}` : ''}`;
+      const count = document.createElement('small');
+      count.textContent = `${formatNumber(item.attendanceCount)} attendance record(s)`;
+      button.append(title, subtitle, count);
+      button.addEventListener('click', event => window.runButtonAction(event.currentTarget, () => selectEventHistory(item.key), 'Loading...'));
+      list.appendChild(button);
+    });
+  }
+
+  async function selectEventHistory(key) {
+    const item = eventHistoryState.occurrences.find(occurrence => occurrence.key === key);
+    if (!item) return;
+    eventHistoryState.selectedKey = item.key;
+    renderEventHistoryList();
+    const panel = document.getElementById('event-history-detail');
+    panel.replaceChildren();
+    const loading = document.createElement('div');
+    loading.className = 'module-empty';
+    loading.textContent = 'Loading event details...';
+    panel.appendChild(loading);
+    try {
+      const details = await apiCall('getEventHistoryDetails', item.eventId, item.scheduleId, item.eventDate);
+      renderEventHistoryDetails(details);
+    } catch (error) {
+      panel.replaceChildren();
+      const message = document.createElement('div');
+      message.className = 'module-empty';
+      message.textContent = error.message || 'Unable to load this event.';
+      panel.appendChild(message);
+    }
+  }
+
+  function renderEventHistoryDetails(details) {
+    const panel = document.getElementById('event-history-detail');
+    panel.replaceChildren();
+    const event = details.event;
+    const heading = document.createElement('header');
+    heading.className = 'event-history-detail-heading';
+    const title = document.createElement('h3');
+    title.textContent = event.eventName;
+    const meta = document.createElement('p');
+    meta.textContent = [event.category, event.eventDate, formatScheduleName(event.scheduleName), event.time ? formatScheduleTime(event.time) : '', event.location].filter(Boolean).join(' · ');
+    heading.append(title, meta);
+    const summary = document.createElement('div');
+    summary.className = 'event-history-summary';
+    [['Present', event.present], ['Absent', event.absent], ['Late', event.late], ['Excused', event.excused], ['Total records', event.attendanceCount]].forEach(([label, value]) => {
+      const metric = document.createElement('div');
+      metric.className = 'event-history-metric';
+      const metricLabel = document.createElement('span');
+      metricLabel.textContent = label;
+      const metricValue = document.createElement('strong');
+      metricValue.textContent = formatNumber(value);
+      metric.append(metricLabel, metricValue);
+      summary.appendChild(metric);
+    });
+    const assignments = document.createElement('div');
+    assignments.className = 'event-history-assignments';
+    if (event.mproIncharge) assignments.appendChild(historyDetailField('MPRO Incharge', event.mproIncharge));
+    if (event.officersAssigned) assignments.appendChild(historyDetailField('Officers Assigned', event.officersAssigned));
+    const description = document.createElement('p');
+    description.className = 'event-history-description';
+    description.textContent = event.description || '';
+    const programTitle = document.createElement('h4');
+    programTitle.textContent = 'Program';
+    const program = document.createElement('pre');
+    program.className = 'special-event-program';
+    program.textContent = event.program || 'No program was recorded for this event.';
+    const attendeeTitle = document.createElement('h4');
+    attendeeTitle.textContent = `Attendance Records (${formatNumber(details.attendees.length)})`;
+    const tableWrap = document.createElement('div');
+    tableWrap.className = 'module-table-scroll event-history-table-wrap';
+    const table = document.createElement('table');
+    table.className = 'module-table event-history-table';
+    const head = table.createTHead().insertRow();
+    ['Member ID', 'Name', 'Category', 'Membership', 'Status', 'Committees'].forEach(label => {
+      const cell = document.createElement('th');
+      cell.textContent = label;
+      head.appendChild(cell);
+    });
+    const body = table.createTBody();
+    if (!details.attendees.length) {
+      const row = body.insertRow();
+      const cell = row.insertCell();
+      cell.colSpan = 6;
+      cell.className = 'module-empty';
+      cell.textContent = 'No attendance records were saved for this event.';
+    }
+    details.attendees.forEach(attendee => {
+      const row = body.insertRow();
+      [attendee.memberId, attendee.name, attendee.member && attendee.member.category || 'Not recorded', attendee.member && attendee.member.membershipStatus || 'Not recorded', attendee.status, attendee.member && attendee.member.committees || 'Not recorded'].forEach(value => {
+        const cell = row.insertCell();
+        cell.textContent = value || 'Not recorded';
+      });
+    });
+    tableWrap.appendChild(table);
+    const footnote = document.createElement('p');
+    footnote.className = 'module-help';
+    footnote.textContent = 'Attendance statuses are historical. Member category, membership, and committee values are current profile data, not an event-time snapshot.';
+    panel.append(heading, summary, assignments, description, programTitle, program, attendeeTitle, tableWrap, footnote);
+  }
+
+  function historyDetailField(label, value) {
+    const field = document.createElement('p');
+    const term = document.createElement('strong');
+    term.textContent = `${label}: `;
+    const detail = document.createElement('span');
+    detail.textContent = value;
+    field.append(term, detail);
+    return field;
+  }
+
+  function renderEmptyEventHistory() {
+    eventHistoryState.selectedKey = '';
+    const panel = document.getElementById('event-history-detail');
+    panel.replaceChildren();
+    const empty = document.createElement('div');
+    empty.className = 'module-empty';
+    empty.textContent = 'Choose a past event to view its program and attendees.';
+    panel.appendChild(empty);
+  }
+
+  function openEventHistoryRecord(occurrence) {
+    eventHistoryState.pendingSelection = occurrence;
+    navigateTo('Event History');
+  }
+
+  document.getElementById('refresh-event-history').addEventListener('click', event => window.runButtonAction(event.currentTarget, loadEventHistory, 'Refreshing...'));
+</script>

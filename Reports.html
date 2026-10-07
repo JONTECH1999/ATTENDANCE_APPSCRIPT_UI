@@ -1,0 +1,413 @@
+<section id="reports-page" class="module-view" hidden>
+  <style>
+    .reports-shell { display: grid; gap: 18px; }
+    .reports-toolbar {
+      display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 14px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow);
+    }
+    .reports-toolbar h2 { margin: 0; font: 800 18px "Manrope", sans-serif; }
+    .reports-toolbar p { margin: 4px 0 0; color: var(--muted); font-size: 11px; }
+    .reports-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .reports-btn {
+      display: inline-flex; align-items: center; justify-content: center; min-height: 32px; padding: 0 12px; color: var(--primary); background: transparent; border: 1px solid #bfd4ff; border-radius: 6px; font-size: 10px; font-weight: 700;
+    }
+    .reports-btn.primary { color: white; background: var(--primary); border-color: var(--primary); }
+    .report-tabs { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 10px 14px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow); }
+    .tab-pill { min-height: 32px; padding: 0 12px; background: transparent; border: 1px solid transparent; border-radius: 6px; font-size: 10px; font-weight: 650; color: var(--muted); }
+    .tab-pill.active { color: var(--primary); background: rgba(37,99,235,.07); border-color: #bfd4ff; }
+    .report-panel {
+      background: var(--surface); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow); overflow: hidden;
+    }
+    .report-panel-header {
+      display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 18px; background: #0f172a; color: white;
+    }
+    .report-panel-header h3 { margin: 0; font: 800 15px "Manrope", sans-serif; }
+    .report-panel-header .badge-inline { display: inline-flex; align-items: center; justify-content: center; min-height: 28px; padding: 0 12px; background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.18); border-radius: 999px; font-size: 9px; font-weight: 700; }
+    .report-table-wrap { overflow: auto; }
+    .report-table { width: 100%; min-width: 820px; border-collapse: collapse; }
+    .report-table th {
+      padding: 12px 10px; color: #dfe8f8; background: rgba(255,255,255,.04); border-bottom: 1px solid rgba(255,255,255,.12); font-size: 9px; letter-spacing: .08em; text-transform: uppercase;
+    }
+    .report-table td {
+      padding: 10px 10px; border-bottom: 1px solid var(--line); color: var(--ink); font-size: 11px; background: transparent;
+    }
+    .report-table tbody tr:nth-child(even) { background: rgba(148,163,184,.03); }
+    .report-table strong { font-weight: 800; }
+    .attendance-badge { display: inline-flex; align-items: center; justify-content: center; min-width: 44px; padding: 4px 8px; border-radius: 999px; font-size: 9px; font-weight: 700; }
+    .attendance-badge.good { color: #0c8d66; background: #e6fff2; }
+    .attendance-badge.warn { color: #a15e00; background: #fff3d5; }
+    .attendance-badge.danger { color: #c9243a; background: #ffe8ea; }
+    .report-signoff { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; padding: 14px 18px 18px; }
+    .signoff-card { padding-top: 14px; border-top: 1px solid var(--line); }
+    .signoff-card strong { display: block; text-transform: uppercase; font-size: 11px; }
+    .signoff-card span { display: block; margin-top: 8px; color: var(--muted); font-size: 9px; letter-spacing: .08em; }
+    .official-template-shell {
+      margin-top: 22px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow); overflow: hidden;
+    }
+    .official-header-bar {
+      display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 18px 24px; background: #0f172a; color: white; min-height: 64px;
+    }
+    .official-header-bar h3 {
+      margin: 0; font: 800 20px "Manrope", sans-serif; text-transform: uppercase; letter-spacing: .04em; text-align: left;
+    }
+    .official-header-bar .scroll-pill {
+      display: inline-flex; align-items: center; justify-content: center; min-height: 30px; padding: 0 12px; background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.18); border-radius: 999px; font-size: 10px; font-weight: 700; white-space: nowrap;
+    }
+    .official-sheet-top {
+      display: grid; grid-template-columns: repeat(14, minmax(0, 1fr)); width: 100%; border-collapse: collapse;
+    }
+    .official-sheet-top .cell {
+      display: flex; align-items: center; justify-content: center; min-height: 52px; padding: 10px 6px; border: 1px solid rgba(0,0,0,.12); background: rgba(226, 233, 245, 0.35); color: #1d2a39; font: 700 11px "Manrope", sans-serif; text-transform: uppercase; text-align: center;
+    }
+    .official-sheet-top .cell.header {
+      background: #0f172a; color: white;
+    }
+    .official-sheet-top .cell.muted { background: #d9eefc; }
+    .official-sheet-top .cell.red { background: #dd5b5b; color: white; }
+    .official-sheet-top .cell.gold { background: #f2d36a; color: #112033; }
+    .official-sheet-top .cell.blue { background: #d5f0ff; }
+    .official-sheet-top .cell.green { background: #d5f3d7; }
+    .official-sheet-top .cell.big { font-size: 14px; }
+    .official-sheet-top .cell.black { background: #0f172a; color: white; }
+    .official-sheet-top .cell.primary { background: #1f6ed6; color: white; }
+    .official-sheet-top .cell.light-blue { background: #bfe6ff; }
+    .official-sheet-top .cell.purple { background: #cfdbff; }
+    .official-sheet-top .cell.orange { background: #f3a55f; color: white; }
+    .official-sheet-top .cell.darkblue { background: #1d5aac; color: white; }
+    .official-template-table {
+      width: 100%; min-width: 2200px; border-collapse: collapse; font-size: 9px; line-height: 1.2;
+    }
+    .official-template-table th,
+    .official-template-table td {
+      padding: 7px 6px; border: 1px solid rgba(15, 23, 42, 0.14); text-align: center; vertical-align: middle; white-space: normal;
+    }
+    .official-template-table thead th {
+      background: #0f172a; color: #ffffff; font-weight: 800; letter-spacing: .04em; text-transform: uppercase;
+    }
+    .official-template-table thead .top-title {
+      background: #1d5aac; color: #ffffff;
+    }
+    .official-template-table tbody td {
+      background: #f8fbff; color: #0f172a; font-weight: 700;
+    }
+    .official-template-table tbody tr:nth-child(odd) td {
+      background: #eef6ff;
+    }
+    .official-sheet-bottom {
+      display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0; border-top: 1px solid rgba(0,0,0,.12);
+    }
+    .official-signoff {
+      display: flex; align-items: center; justify-content: space-between; padding: 0 18px 18px; border-top: 1px solid var(--line);
+    }
+    .official-signoff-box {
+      flex: 1; padding-top: 18px; border-top: 1px solid var(--line); text-align: left;
+    }
+    .official-signoff-box strong {
+      display: block; text-transform: uppercase; font-size: 11px; letter-spacing: .03em; color: #1f2937;
+    }
+    .official-signoff-box span {
+      display: block; margin-top: 8px; color: var(--muted); font-size: 9px; letter-spacing: .08em;
+    }
+    @media (max-width: 700px) {
+      .reports-toolbar { flex-direction: column; align-items: flex-start; }
+      .report-tab-strip { justify-content: flex-start; }
+      .report-signoff { grid-template-columns: 1fr; }
+      .official-header-bar { flex-direction: column; align-items: flex-start; }
+    }
+  </style>
+
+  <div class="reports-shell">
+    <div class="reports-toolbar">
+      <div>
+        <h2>Official Administrative Reports · Local of Ascoville</h2>
+        <p>MCGI youth official membership statistics, demographic breakdown, and per-gathering attendance.</p>
+      </div>
+      <div class="reports-actions">
+        <button class="reports-btn primary" type="button">Push to Google Sheets</button>
+        <button class="reports-btn" type="button">Export Official CSV</button>
+        <button class="reports-btn" type="button">Save Snapshot</button>
+        <button class="reports-btn" type="button">Print</button>
+      </div>
+    </div>
+
+    <div class="report-tabs">
+      <button class="tab-pill active" type="button">Monthly</button>
+      <button class="tab-pill" type="button">Quarterly</button>
+      <button class="tab-pill" type="button">Yearly</button>
+      <button class="tab-pill" type="button">Custom</button>
+      <button class="tab-pill" type="button">September 2026</button>
+    </div>
+
+    <div class="report-panel">
+      <div class="report-panel-header">
+        <h3>MCGI YOUTH MINISTRY · LOCAL OF ASCOVILLE</h3>
+        <span class="badge-inline">Total Gatherings: 7</span>
+      </div>
+
+      <div class="report-table-wrap">
+        <table class="report-table">
+          <thead>
+            <tr>
+              <th>Gathering Name</th>
+              <th>Type</th>
+              <th>Date / Schedule</th>
+              <th>Present</th>
+              <th>Absent</th>
+              <th>Late</th>
+              <th>Excused</th>
+              <th>Total Logs</th>
+              <th>Attendance Rate</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Congregational Prayer Meeting</td>
+              <td>Prayer Meeting</td>
+              <td>2026-10-07</td>
+              <td>15</td><td>3</td><td>2</td><td>3</td><td>23</td>
+              <td><span class="attendance-badge good">85%</span></td>
+            </tr>
+            <tr>
+              <td>Weekly Thanksgiving to God</td>
+              <td>Thanksgiving</td>
+              <td>2026-09-19</td>
+              <td>1</td><td>0</td><td>0</td><td>0</td><td>1</td>
+              <td><span class="attendance-badge good">100%</span></td>
+            </tr>
+            <tr>
+              <td>Worship Service</td>
+              <td>Worship Service</td>
+              <td>2026-10-10</td>
+              <td>0</td><td>0</td><td>0</td><td>0</td><td>0</td>
+              <td><span class="attendance-badge warn">0%</span></td>
+            </tr>
+            <tr>
+              <td>youth gathering</td>
+              <td>Other</td>
+              <td>2026-10-04</td>
+              <td>0</td><td>0</td><td>0</td><td>0</td><td>0</td>
+              <td><span class="attendance-badge warn">0%</span></td>
+            </tr>
+            <tr>
+              <td>Weekly Thanksgiving to God</td>
+              <td>Thanksgiving</td>
+              <td>2026-10-10</td>
+              <td>0</td><td>0</td><td>0</td><td>0</td><td>0</td>
+              <td><span class="attendance-badge warn">0%</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="report-panel">
+      <div class="report-panel-header">
+        <h3>OFFICIAL MEMBERSHIP STATISTICS &amp; DEMOGRAPHICS SUMMARY</h3>
+        <span class="badge-inline">Scroll horizontally</span>
+      </div>
+      <div class="report-table-wrap">
+        <table class="report-table">
+          <thead>
+            <tr>
+              <th>Suspended</th>
+              <th>Bilang Napatawad</th>
+              <th>Missing</th>
+              <th>NBB Youth - 2nd Quarter</th>
+              <th>June</th>
+              <th>July</th>
+              <th>August</th>
+              <th>Overall Total</th>
+              <th>Multiple Comm</th>
+              <th>Artist Guild</th>
+              <th>Broadcast</th>
+              <th>Core Group</th>
+              <th>MCGI DRRT</th>
+              <th>Guest Coordinators</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>64</td><td>18</td><td>7</td><td>10</td><td>16</td><td>0</td><td>5</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="report-signoff">
+      <div class="signoff-card"><strong>Your Full Name</strong><span>Prepared by (Youth Officer)</span></div>
+      <div class="signoff-card"><strong>Ascoville Youth Committee</strong><span>Reviewed by (Core Group)</span></div>
+      <div class="signoff-card"><strong>Assigned Worker</strong><span>Noted / Approved by</span></div>
+    </div>
+  </div>
+
+  <div class="official-template-shell" aria-label="Official membership spreadsheet template">
+    <div class="official-header-bar">
+      <h3>OFFICIAL MEMBERSHIP STATISTICS &amp; DEMOGRAPHICS SUMMARY</h3>
+      <span class="scroll-pill">Official Summary</span>
+    </div>
+
+    <div style="overflow-x: auto;">
+      <table class="official-template-table" aria-label="Official summary table from OFFICIAL_SUMMARY">
+        <thead>
+          <tr>
+            <th colspan="1" class="top-title">MEMBERSHIP STATISTICS</th>
+            <th colspan="1" class="top-title">MEMBERSHIP STATISTICS</th>
+            <th colspan="1" class="top-title">MEMBERSHIP STATISTICS</th>
+            <th colspan="1" class="top-title">MEMBERSHIP STATISTICS</th>
+            <th colspan="1" class="top-title">MEMBERSHIP STATISTICS</th>
+            <th colspan="1" class="top-title">MEMBERSHIP STATISTICS</th>
+            <th colspan="1" class="top-title">MEMBERSHIP STATISTICS</th>
+            <th colspan="1" class="top-title">MEMBERSHIP STATISTICS</th>
+            <th colspan="1" class="top-title">MEMBERSHIP STATISTICS</th>
+            <th colspan="1" class="top-title">MEMBERSHIP STATISTICS</th>
+            <th colspan="1" class="top-title">MEMBERSHIP STATISTICS</th>
+            <th colspan="1" class="top-title">MEMBERSHIP STATISTICS</th>
+            <th colspan="1" class="top-title">MEMBERSHIP STATISTICS</th>
+            <th colspan="1" class="top-title">MEMBERSHIP STATISTICS</th>
+            <th colspan="1" class="top-title">MEMBERSHIP STATISTICS</th>
+            <th colspan="1" class="top-title">MEMBERSHIP STATISTICS</th>
+            <th colspan="1" class="top-title">MEMBERSHIP STATISTICS</th>
+            <th colspan="1" class="top-title">MEMBERSHIP STATISTICS</th>
+            <th colspan="1" class="top-title">MEMBERSHIP STATISTICS</th>
+            <th colspan="1" class="top-title">MEMBERSHIP STATISTICS</th>
+            <th colspan="1" class="top-title">MEMBERSHIP STATISTICS</th>
+            <th colspan="1" class="top-title">MEMBERSHIP STATISTICS</th>
+            <th colspan="1" class="top-title">DEMOGRAPHICS</th>
+            <th colspan="1" class="top-title">DEMOGRAPHICS</th>
+            <th colspan="1" class="top-title">DEMOGRAPHICS</th>
+            <th colspan="1" class="top-title">DEMOGRAPHICS</th>
+            <th colspan="1" class="top-title">DEMOGRAPHICS</th>
+            <th colspan="1" class="top-title">DEMOGRAPHICS</th>
+            <th colspan="1" class="top-title">DEMOGRAPHICS</th>
+            <th colspan="1" class="top-title">DEMOGRAPHICS</th>
+            <th colspan="1" class="top-title">DEMOGRAPHICS</th>
+            <th colspan="1" class="top-title">DEMOGRAPHICS</th>
+            <th colspan="1" class="top-title">DEMOGRAPHICS</th>
+            <th colspan="1" class="top-title">DEMOGRAPHICS</th>
+            <th colspan="1" class="top-title">DEMOGRAPHICS</th>
+            <th colspan="1" class="top-title">DEMOGRAPHICS</th>
+            <th colspan="1" class="top-title">DEMOGRAPHICS</th>
+            <th colspan="1" class="top-title">DEMOGRAPHICS</th>
+            <th colspan="1" class="top-title">DEMOGRAPHICS</th>
+            <th colspan="1" class="top-title">DEMOGRAPHICS</th>
+            <th colspan="1" class="top-title">DEMOGRAPHICS</th>
+            <th colspan="1" class="top-title">DEMOGRAPHICS</th>
+            <th colspan="1" class="top-title">DEMOGRAPHICS</th>
+            <th colspan="1" class="top-title">DEMOGRAPHICS</th>
+            <th colspan="1" class="top-title">DEMOGRAPHICS</th>
+            <th colspan="1" class="top-title">DEMOGRAPHICS</th>
+            <th colspan="1" class="top-title">DEMOGRAPHICS</th>
+          </tr>
+          <tr>
+            <th>(AUTO) NUMBER OF REGISTERED MEMBERS</th>
+            <th>(AUTO) TOTAL ACTIVE MEMBERS (JUNIOR + SENIOR)</th>
+            <th>JUNIOR (14 TO 24 YEARS OLD)</th>
+            <th>SENIOR (25 YEARS OLD &amp; ABOVE)</th>
+            <th>(AUTO) TOTAL ON &amp; OFF MEMBERS (JUNIOR + SENIOR)</th>
+            <th>JUNIOR (14 TO 24 YEARS OLD)</th>
+            <th>SENIOR (25 YEARS OLD &amp; ABOVE)</th>
+            <th>(AUTO) TOTAL INACTIVE MEMBERS (JUNIOR + SENIOR)</th>
+            <th>JUNIOR (14 TO 24 YEARS OLD)</th>
+            <th>SENIOR (25 YEARS OLD &amp; ABOVE)</th>
+            <th>(AUTO) TOTAL SUSPENDED MEMBERS (ACTIVE + ON &amp; OFF + INACTIVE/RFA)</th>
+            <th>ACTIVE SUSPENDED</th>
+            <th>ON &amp; OFF SUSPENDED</th>
+            <th>INACTIVE / RFA</th>
+            <th>BILANG NG NAPATAWAD</th>
+            <th>MISSING</th>
+            <th>(AUTO) OVERALL TOTAL</th>
+            <th>JUNE</th>
+            <th>JULY</th>
+            <th>AUGUST</th>
+            <th>(AUTO) OVERALL TOTAL</th>
+            <th>MULTIPLE COMMITTEE</th>
+            <th>ARTIST GUILD</th>
+            <th>BROADCAST</th>
+            <th>CORE GROUP</th>
+            <th>MCGI DRRT</th>
+            <th>GUEST COORDINATORS</th>
+            <th>LKD</th>
+            <th>MCGI BIBLE READERS</th>
+            <th>MUSIC MINISTRY</th>
+            <th>NAR</th>
+            <th>OFFICERS (YOUTH, GS, LOCALE/DISTRICT)</th>
+            <th>PHOTOVILLE</th>
+            <th>RACS</th>
+            <th>SERVANTS MINISTRY</th>
+            <th>TEATRO KRISTIANO</th>
+            <th>T.O.C. (THANKSGIVING COMMITTEE)</th>
+            <th>OTHERS</th>
+            <th>WITHOUT COMMITTEE</th>
+            <th>TOTAL NUMBER OF STUDENTS</th>
+            <th>TOTAL NUMBER OF YOUTH MEMBERS WITH WORK</th>
+            <th>TOTAL NUMBER OF REGISTERED VOTERS (18 YEARS &amp; ABOVE)</th>
+            <th>TOTAL NUMBER OF WORKING STUDENTS</th>
+            <th>TOTAL NUMBER OF OUT OF SCHOOL YOUTH</th>
+            <th>MOTHER ONLY</th>
+            <th>FATHER ONLY</th>
+            <th>BOTH MOTHER &amp; FATHER</th>
+            <th>TOTAL NUMBER OF MCGI YOUTH WITH UNBAPTIZED PARENT/S</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>64</td>
+            <td>59</td>
+            <td>46</td>
+            <td>13</td>
+            <td>2</td>
+            <td>2</td>
+            <td>0</td>
+            <td>3</td>
+            <td>3</td>
+            <td>0</td>
+            <td>0</td>
+            <td>0</td>
+            <td>0</td>
+            <td>0</td>
+            <td>0</td>
+            <td>0</td>
+            <td>0</td>
+            <td>0</td>
+            <td>0</td>
+            <td>0</td>
+            <td>-863</td>
+            <td>18</td>
+            <td>7</td>
+            <td>10</td>
+            <td>4</td>
+            <td>8</td>
+            <td>5</td>
+            <td>5</td>
+            <td>4</td>
+            <td>7</td>
+            <td>0</td>
+            <td>4</td>
+            <td>7</td>
+            <td>0</td>
+            <td>7</td>
+            <td>9</td>
+            <td>4</td>
+            <td>0</td>
+            <td>927</td>
+            <td>39</td>
+            <td>19</td>
+            <td>57</td>
+            <td>11</td>
+            <td>4</td>
+            <td>9</td>
+            <td>12</td>
+            <td>22</td>
+            <td>21</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="official-signoff">
+      <div class="official-signoff-box"><strong>Your Full Name</strong><span>Prepared by (Youth Officer)</span></div>
+      <div class="official-signoff-box"><strong>Ascoville Youth Committee</strong><span>Reviewed by (Core Group)</span></div>
+      <div class="official-signoff-box"><strong>Assigned Worker</strong><span>Noted / Approved by</span></div>
+    </div>
+  </div>
+</section>

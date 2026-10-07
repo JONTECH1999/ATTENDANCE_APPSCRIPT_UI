@@ -1,0 +1,199 @@
+<section id="demographics-page" class="module-view" hidden>
+  <style>
+    .demographic-shell { display: grid; gap: 18px; }
+    .demographic-header {
+      display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 18px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow);
+    }
+    .demographic-header .eyebrow { margin: 0; }
+    .demographic-header h2 { margin: 2px 0 0; font: 800 18px "Manrope", sans-serif; }
+    .header-badges { display: flex; gap: 8px; flex-wrap: wrap; }
+    .mini-badge {
+      display: inline-flex; align-items: center; justify-content: center; min-height: 30px; padding: 0 12px; color: var(--primary); background: transparent; border: 1px solid #bfd4ff; border-radius: 999px; font-size: 10px; font-weight: 700; white-space: nowrap;
+    }
+    .mini-badge.light { color: var(--muted); background: var(--surface); border-color: var(--line); }
+    .demographic-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+    .demographic-card {
+      min-width: 0; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow); overflow: hidden;
+    }
+    .demographic-card-header { display: flex; align-items: center; gap: 10px; padding: 16px 18px 12px; }
+    .demographic-card-icon { display: grid; place-items: center; width: 28px; height: 28px; color: var(--primary); background: var(--primary-soft); border-radius: 8px; font-size: 16px; }
+    .demographic-card-header h3 { margin: 0; font: 800 17px "Manrope", sans-serif; }
+    .demographic-card-header p { margin: 3px 0 0; color: var(--muted); font-size: 10px; }
+    .demographic-card-body { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; padding: 0 18px 18px; }
+    .stat-mini { padding: 12px 10px; background: color-mix(in srgb, var(--canvas) 72%, var(--surface)); border: 1px solid var(--line); border-radius: 8px; }
+    .stat-mini .label { display: block; color: var(--muted); font-size: 9px; text-transform: uppercase; letter-spacing: .04em; }
+    .stat-mini strong { display: block; margin-top: 8px; font: 800 25px "Manrope", sans-serif; }
+    .stat-mini .percent { display: block; margin-top: 4px; color: var(--muted); font-size: 9px; }
+    .report-shell {
+      background: var(--surface); border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow); overflow: hidden;
+    }
+    .report-shell-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 18px; background: #0f172a; color: white; }
+    .report-shell-header h3 { margin: 0; font: 800 14px "Manrope", sans-serif; }
+    .report-shell-header .badge-inline { display: inline-flex; align-items: center; justify-content: center; min-height: 26px; padding: 0 12px; color: white; background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.18); border-radius: 999px; font-size: 9px; font-weight: 700; }
+    .report-table-wrap { overflow: auto; }
+    .report-table { width: 100%; min-width: 840px; border-collapse: collapse; }
+    .report-table th { padding: 12px 10px; color: #dfe8f8; background: rgba(255,255,255,.04); border-bottom: 1px solid rgba(255,255,255,.12); font-size: 9px; letter-spacing: .08em; text-transform: uppercase; }
+    .report-table td { padding: 10px 10px; border-bottom: 1px solid var(--line); color: var(--ink); font-size: 11px; }
+    .report-table tbody tr:nth-child(even) { background: color-mix(in srgb, var(--canvas) 48%, var(--surface)); }
+    .report-table td strong { font-weight: 800; }
+    .report-table .status-good { color: #089c69; font-weight: 700; }
+    .report-table .status-warn { color: #a15e00; font-weight: 700; }
+    .report-table .status-danger { color: #c9243a; font-weight: 700; }
+    .report-table .status-blue { color: #2b63c7; font-weight: 700; }
+    .report-table .status-purple { color: #7b4ec9; font-weight: 700; }
+    .report-table .total-row td { background: rgba(37,99,235,.05); font-weight: 800; }
+    .demographic-signoff { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; padding-top: 8px; }
+    .signoff-box { display: flex; align-items: center; justify-content: space-between; padding-top: 16px; border-top: 1px solid var(--line); }
+    .signoff-box strong { display: block; text-transform: uppercase; font-size: 11px; }
+    .signoff-box span { display: block; margin-top: 8px; color: var(--muted); font-size: 9px; letter-spacing: .08em; }
+    @media (max-width: 700px) {
+      .demographic-grid { grid-template-columns: 1fr; }
+      .demographic-card-body { grid-template-columns: 1fr; }
+      .demographic-signoff { grid-template-columns: 1fr; }
+      .demographic-header { flex-direction: column; align-items: flex-start; }
+    }
+  </style>
+
+  <div class="demographic-shell">
+    <div class="demographic-header">
+      <div>
+        <p class="eyebrow">Demographic classifications &amp; breakdown</p>
+        <h2>Official youth demographic metrics synchronized with Google Sheets DEMOGRAPHICS tab</h2>
+      </div>
+      <div class="header-badges">
+        <span class="mini-badge">Live Database (64 Members)</span>
+        <span class="mini-badge light">Official Sample Baseline (2,649)</span>
+      </div>
+    </div>
+
+    <div class="demographic-grid">
+      <article class="demographic-card">
+        <div class="demographic-card-header">
+          <span class="demographic-card-icon">👥</span>
+          <div><h3>Age Classification</h3><p>Junior (&lt; 18) vs Senior (18+)</p></div>
+        </div>
+        <div class="demographic-card-body">
+          <div class="stat-mini"><span class="label">Junior Youths (&lt; 18)</span><strong>51</strong><span class="percent">79.7%</span></div>
+          <div class="stat-mini"><span class="label">Senior Youths (18+)</span><strong>13</strong><span class="percent">20.3%</span></div>
+        </div>
+      </article>
+
+      <article class="demographic-card">
+        <div class="demographic-card-header">
+          <span class="demographic-card-icon">🎓</span>
+          <div><h3>Education Profile</h3><p>School enrollment, working students, and OSY</p></div>
+        </div>
+        <div class="demographic-card-body">
+          <div class="stat-mini"><span class="label">Total Students</span><strong>39</strong><span class="percent">60.9%</span></div>
+          <div class="stat-mini"><span class="label">Working Students</span><strong>11</strong><span class="percent">17.2%</span></div>
+          <div class="stat-mini"><span class="label">Out of School (OSY)</span><strong>4</strong><span class="percent">6.3%</span></div>
+        </div>
+      </article>
+
+      <article class="demographic-card">
+        <div class="demographic-card-header">
+          <span class="demographic-card-icon">💼</span>
+          <div><h3>Employment Status</h3><p>Youths with employment or self-employed</p></div>
+        </div>
+        <div class="demographic-card-body">
+          <div class="stat-mini"><span class="label">Youth With Work (Employed)</span><strong>19</strong><span class="percent">29.7%</span></div>
+          <div class="stat-mini"><span class="label">Not Working / Dependent</span><strong>45</strong><span class="percent">70.3%</span></div>
+        </div>
+      </article>
+
+      <article class="demographic-card">
+        <div class="demographic-card-header">
+          <span class="demographic-card-icon">🗳️</span>
+          <div><h3>Voter Registration</h3><p>Registered in local government elections</p></div>
+        </div>
+        <div class="demographic-card-body">
+          <div class="stat-mini"><span class="label">Registered Voters</span><strong>57</strong><span class="percent">89.1%</span></div>
+          <div class="stat-mini"><span class="label">Not Registered</span><strong>7</strong><span class="percent">10.9%</span></div>
+        </div>
+      </article>
+    </div>
+
+    <article class="demographic-card">
+      <div class="demographic-card-header">
+        <span class="demographic-card-icon">💞</span>
+        <div><h3>Parent Baptism Status</h3><p>Ecclesiastical household status</p></div>
+      </div>
+      <div class="demographic-card-body">
+        <div class="stat-mini"><span class="label">Both Mother &amp; Father</span><strong>22</strong><span class="percent">34.4%</span></div>
+        <div class="stat-mini"><span class="label">Mother Only</span><strong>9</strong><span class="percent">14.1%</span></div>
+        <div class="stat-mini"><span class="label">Father Only</span><strong>12</strong><span class="percent">18.8%</span></div>
+        <div class="stat-mini"><span class="label">Unbaptized Parent/s</span><strong>21</strong><span class="percent">32.8%</span></div>
+      </div>
+    </article>
+
+    <article class="report-shell">
+      <div class="report-shell-header">
+        <h3>Official Membership Statistics &amp; Demographics Summary</h3>
+        <span class="badge-inline">Multiple Committees: 18 Youths</span>
+      </div>
+      <div class="report-table-wrap">
+        <table class="report-table">
+          <thead>
+            <tr>
+              <th>Committee</th>
+              <th>Count</th>
+              <th>% of Youths</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>Artis Guild</td><td><strong>7</strong></td><td class="status-blue">10.9%</td></tr>
+            <tr><td>Broadcast</td><td><strong>10</strong></td><td class="status-blue">15.6%</td></tr>
+            <tr><td>Core Group</td><td><strong>16</strong></td><td class="status-blue">25.0%</td></tr>
+            <tr><td>MCGI DRRT</td><td><strong>0</strong></td><td class="status-blue">0%</td></tr>
+            <tr><td>Guest Coordinators</td><td><strong>5</strong></td><td class="status-blue">7.8%</td></tr>
+            <tr><td>LKD</td><td><strong>5</strong></td><td class="status-blue">7.8%</td></tr>
+            <tr><td>MCGI Bible Readers</td><td><strong>0</strong></td><td class="status-blue">0%</td></tr>
+            <tr><td>Music Ministry</td><td><strong>8</strong></td><td class="status-blue">12.5%</td></tr>
+            <tr><td>NAR</td><td><strong>0</strong></td><td class="status-blue">0%</td></tr>
+            <tr><td>Officers (Youth, GS, L...)</td><td><strong>8</strong></td><td class="status-blue">12.5%</td></tr>
+            <tr><td>Photoville</td><td><strong>7</strong></td><td class="status-blue">10.9%</td></tr>
+            <tr><td>RACS</td><td><strong>0</strong></td><td class="status-blue">0%</td></tr>
+            <tr><td>Servants Ministry</td><td><strong>7</strong></td><td class="status-blue">10.9%</td></tr>
+            <tr><td>Teatro Kristiano</td><td><strong>9</strong></td><td class="status-blue">14.1%</td></tr>
+            <tr><td>T.O.C. (Thanksgiving ...)</td><td><strong>4</strong></td><td class="status-blue">6.3%</td></tr>
+            <tr><td>Others</td><td><strong>4</strong></td><td class="status-blue">6.3%</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </article>
+
+    <article class="report-shell">
+      <div class="report-shell-header">
+        <h3>Official Membership Statistics &amp; Demographics Summary</h3>
+        <span class="badge-inline">Total Registered: 64</span>
+      </div>
+      <div class="report-table-wrap">
+        <table class="report-table">
+          <thead>
+            <tr>
+              <th>Category</th>
+              <th>Junior (&lt; 18)</th>
+              <th>Senior (18+)</th>
+              <th>Total Count</th>
+              <th>Percentage of total</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td><span class="status-good">● Active Members</span></td><td>46</td><td>13</td><td><strong>59</strong></td><td class="status-good">92.2%</td></tr>
+            <tr><td><span class="status-warn">● On &amp; Off Members</span></td><td>2</td><td>0</td><td><strong>2</strong></td><td class="status-warn">3.1%</td></tr>
+            <tr><td><span class="status-danger">● Inactive Members</span></td><td>2</td><td>0</td><td><strong>2</strong></td><td class="status-danger">3.1%</td></tr>
+            <tr><td><span class="status-purple">● Suspended Total</span></td><td>0</td><td>0</td><td><strong>0</strong></td><td class="status-purple">0%</td></tr>
+            <tr><td><span class="status-blue">● Missing Members</span></td><td>0</td><td>0</td><td><strong>0</strong></td><td class="status-blue">0%</td></tr>
+            <tr class="total-row"><td><strong>TOTAL REGISTERED MEMBERS</strong></td><td><strong>50</strong></td><td><strong>13</strong></td><td><strong>64</strong></td><td><strong>100.0%</strong></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </article>
+
+    <div class="demographic-signoff">
+      <div class="signoff-box"><div><strong>Your Full Name</strong><span>Prepared by (Youth Officer)</span></div></div>
+      <div class="signoff-box"><div><strong>Ascoville Youth Committee</strong><span>Reviewed by (Core Group)</span></div></div>
+      <div class="signoff-box"><div><strong>Assigned Worker</strong><span>Noted / Approved by</span></div></div>
+    </div>
+  </div>
+</section>
