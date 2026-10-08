@@ -95,3 +95,79 @@
     </div>
   </div>
 </section>
+
+<script>
+  async function loadStatisticsModule() {
+    if (state.page !== 'Statistics') return;
+    try {
+      const stats = await apiCall('getMembersStatistics');
+      renderDynamicStatisticsModule(stats);
+      state.loadedPages['Statistics'] = true;
+    } catch (err) {
+      console.warn('Statistics module dynamic load error:', err);
+    }
+  }
+
+  function renderDynamicStatisticsModule(stats) {
+    if (!stats || !stats.members) return;
+    const total = stats.members.length;
+    const badge = document.querySelector('#statistics-page-module .badge-inline');
+    if (badge) badge.textContent = `Total Registered: ${total}`;
+
+    const categories = {
+      active: { junior: 0, senior: 0, total: 0 },
+      onAndOff: { junior: 0, senior: 0, total: 0 },
+      inactive: { junior: 0, senior: 0, total: 0 },
+      suspended: { junior: 0, senior: 0, total: 0 },
+      missing: { junior: 0, senior: 0, total: 0 }
+    };
+
+    stats.members.forEach(m => {
+      const isJunior = /junior/i.test(m.category || '');
+      const status = String(m.membershipStatus || '').toLowerCase();
+      let key = 'active';
+      if (/on\s*(&|and)\s*off/i.test(status)) key = 'onAndOff';
+      else if (/inactive/i.test(status)) key = 'inactive';
+      else if (/suspended/i.test(status)) key = 'suspended';
+      else if (/missing/i.test(status)) key = 'missing';
+
+      if (isJunior) categories[key].junior++;
+      else categories[key].senior++;
+      categories[key].total++;
+    });
+
+    const tbody = document.querySelector('#statistics-page-module .statistics-report-table tbody');
+    if (!tbody) return;
+    tbody.replaceChildren();
+
+    const rowsDef = [
+      { label: 'Active Members', dot: 'legend-success', data: categories.active },
+      { label: 'On & Off Members', dot: 'legend-warning', data: categories.onAndOff },
+      { label: 'Inactive Members', dot: 'legend-danger', data: categories.inactive },
+      { label: 'Suspended Total', dot: 'legend-purple', data: categories.suspended },
+      { label: 'Missing Members', dot: 'legend-blue', data: categories.missing },
+    ];
+
+    rowsDef.forEach(r => {
+      const tr = document.createElement('tr');
+      const pct = total ? ((r.data.total / total) * 100).toFixed(1) + '%' : '0%';
+      tr.innerHTML = `<td><span class="legend-dot ${r.dot}"></span>${r.label}</td>
+        <td>${r.data.junior}</td>
+        <td>${r.data.senior}</td>
+        <td><strong>${r.data.total}</strong></td>
+        <td><strong>${pct}</strong></td>`;
+      tbody.appendChild(tr);
+    });
+
+    const totalJunior = Object.values(categories).reduce((acc, c) => acc + c.junior, 0);
+    const totalSenior = Object.values(categories).reduce((acc, c) => acc + c.senior, 0);
+    const totalRow = document.createElement('tr');
+    totalRow.className = 'statistics-total-row';
+    totalRow.innerHTML = `<td><strong>TOTAL REGISTERED MEMBERS</strong></td>
+      <td><strong>${totalJunior}</strong></td>
+      <td><strong>${totalSenior}</strong></td>
+      <td><strong>${total}</strong></td>
+      <td><strong>100.0%</strong></td>`;
+    tbody.appendChild(totalRow);
+  }
+</script>
