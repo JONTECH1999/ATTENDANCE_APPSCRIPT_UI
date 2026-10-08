@@ -85,7 +85,7 @@
       if(event.program){const program=document.createElement('details');program.className='weekly-event-program';const summary=document.createElement('summary');summary.textContent='View event program';const content=document.createElement('pre');content.textContent=event.program;program.append(summary,content);info.appendChild(program);}
       const actionsGroup=document.createElement('div');actionsGroup.style.display='flex';actionsGroup.style.gap='6px';
       const add=document.createElement('button');add.type='button';add.className='module-button success-outline';add.innerHTML='<span class="material-symbols-rounded">add</span>Add Schedule';add.addEventListener('click',()=>openScheduleEditor(event.eventId));
-      const delEvent=document.createElement('button');delEvent.type='button';delEvent.className='module-button danger-outline';delEvent.innerHTML='<span class="material-symbols-rounded">delete</span>Archive Gathering';delEvent.title='Move to Archive Trash (retained 30 days)';delEvent.addEventListener('click',()=>archiveGatheringFromWeekly(event));
+      const delEvent=document.createElement('button');delEvent.type='button';delEvent.className='module-button danger-outline';delEvent.innerHTML='<span class="material-symbols-rounded">delete</span>Archive Gathering';delEvent.title='Move to Archive Trash (retained 30 days)';delEvent.addEventListener('click',(e)=>archiveGatheringFromWeekly(event,e.currentTarget));
       actionsGroup.append(add,delEvent);
       head.append(info,actionsGroup);panel.appendChild(head);
       const body=document.createElement('div');body.className='event-schedules-body';
@@ -94,7 +94,7 @@
       event.schedules.forEach(schedule=>{
         const card=document.createElement('article');card.className='schedule-card';
         const cardTitle=document.createElement('strong');
-        cardTitle.textContent=schedule.dayOfWeek&&/^([A-Za-z]+)\s+\d{1,2}:\d{2}$/.test(schedule.name||'')?`${schedule.dayOfWeek} gathering`:formatScheduleName(schedule.name);
+        cardTitle.textContent=formatScheduleName(schedule.name);
         const scheduleId=document.createElement('small');scheduleId.className='schedule-id';scheduleId.textContent=schedule.scheduleId||'';
         const occurrenceDate = scheduleOccurrenceDate(schedule, start) || event.date || '';
         const date=document.createElement('span');date.textContent=`${schedule.dayOfWeek ? `${schedule.dayOfWeek} · ` : ''}${formatCalendarDate(occurrenceDate)}`;
@@ -106,7 +106,7 @@
         const actions=document.createElement('div');actions.className='schedule-card-actions';
         const action=document.createElement('button');action.type='button';action.className='schedule-attendance-link';action.innerHTML='<span class="material-symbols-rounded">task_alt</span>Take Attendance';action.addEventListener('click',()=>{const wasLoaded=state.loadedPages['Fast Attendance'];fastAttendanceState.eventId=event.eventId;fastAttendanceState.scheduleId=schedule.scheduleId;fastAttendanceState.date=occurrenceDate;fastAttendanceState.requestedDate=occurrenceDate;fastAttendanceState.scheduleWasManuallySelected=true;navigateTo('Fast Attendance');if(wasLoaded)loadFastAttendance();});
         const edit=document.createElement('button');edit.type='button';edit.className='schedule-attendance-link';edit.innerHTML='<span class="material-symbols-rounded">edit</span>Edit Schedule';edit.addEventListener('click',()=>openScheduleEditor(event.eventId,schedule));
-        const delSch=document.createElement('button');delSch.type='button';delSch.className='schedule-attendance-link';delSch.style.color='#d32f2f';delSch.innerHTML='<span class="material-symbols-rounded">delete</span>Archive';delSch.title='Move schedule to Archive Trash (retained 30 days)';delSch.addEventListener('click',()=>archiveScheduleFromWeekly(event,schedule));
+        const delSch=document.createElement('button');delSch.type='button';delSch.className='schedule-attendance-link';delSch.style.color='#d32f2f';delSch.innerHTML='<span class="material-symbols-rounded">delete</span>Archive';delSch.title='Move schedule to Archive Trash (retained 30 days)';delSch.addEventListener('click',(e)=>archiveScheduleFromWeekly(event,schedule,e.currentTarget));
         actions.append(action,edit,delSch);
         card.append(cardTitle,scheduleId,date,time,location,mpro,officers,actions);grid.appendChild(card);
       });
@@ -119,7 +119,7 @@
     const select=document.getElementById('schedule-event-choice');select.replaceChildren();weeklyScheduleState.events.forEach(event=>select.add(new Option(event.name,event.eventId)));
     const form=document.getElementById('schedule-editor-form');form.reset();select.value=eventId||'';
     form.elements.scheduleId.value=schedule?schedule.scheduleId:'';
-    form.elements.name.value=schedule?schedule.name:'';
+    form.elements.name.value=schedule?formatScheduleName(schedule.name):'';
     form.elements.dayOfWeek.value=schedule?schedule.dayOfWeek||'':'';
     form.elements.date.value=schedule?schedule.date||'':dateInputValue(new Date());
     form.elements.time.value=schedule&&schedule.time?formatScheduleTime(schedule.time):'';
@@ -148,28 +148,42 @@
     },data.scheduleId?'Updating...':'Saving...');
   }
 
-  async function archiveGatheringFromWeekly(event) {
+  async function archiveGatheringFromWeekly(event, triggerButton) {
     if (!window.confirm(`Move gathering "${event.name}" (${event.eventId}) and all its schedules to Archive Trash?\n\nIt will be retained for 30 days before permanent deletion.`)) return;
-    try {
-      const result = await apiCall('moveEventToTrash', event.eventId);
-      showToast(result.message, 'success');
-      await loadWeeklySchedule();
-      refreshLiveGatheringEvents();
-    } catch (err) {
-      showToast(err.message || 'Unable to archive gathering.', 'error');
+    const action = async () => {
+      try {
+        const result = await apiCall('moveEventToTrash', event.eventId);
+        showToast(result.message, 'success');
+        await loadWeeklySchedule();
+        refreshLiveGatheringEvents();
+      } catch (err) {
+        showToast(err.message || 'Unable to archive gathering.', 'error');
+      }
+    };
+    if (triggerButton && window.runButtonAction) {
+      await window.runButtonAction(triggerButton, action, 'Archiving...');
+    } else {
+      await action();
     }
   }
 
-  async function archiveScheduleFromWeekly(event, schedule) {
+  async function archiveScheduleFromWeekly(event, schedule, triggerButton) {
     const sName = schedule.name || `${schedule.dayOfWeek || ''} ${schedule.time || ''}`.trim() || 'Schedule';
     if (!window.confirm(`Move schedule "${sName}" (${schedule.scheduleId}) of "${event.name}" to Archive Trash?\n\nIt will be retained for 30 days before permanent deletion.`)) return;
-    try {
-      const result = await apiCall('moveScheduleToTrash', schedule.scheduleId);
-      showToast(result.message, 'success');
-      await loadWeeklySchedule();
-      refreshLiveGatheringEvents();
-    } catch (err) {
-      showToast(err.message || 'Unable to archive schedule.', 'error');
+    const action = async () => {
+      try {
+        const result = await apiCall('moveScheduleToTrash', schedule.scheduleId);
+        showToast(result.message, 'success');
+        await loadWeeklySchedule();
+        refreshLiveGatheringEvents();
+      } catch (err) {
+        showToast(err.message || 'Unable to archive schedule.', 'error');
+      }
+    };
+    if (triggerButton && window.runButtonAction) {
+      await window.runButtonAction(triggerButton, action, 'Archiving...');
+    } else {
+      await action();
     }
   }
 
@@ -208,16 +222,18 @@
         const restoreBtn = document.createElement('button');
         restoreBtn.className = 'module-button success-outline';
         restoreBtn.innerHTML = '<span class="material-symbols-rounded">restore_from_trash</span>Restore';
-        restoreBtn.onclick = async () => {
-          try {
-            const res = await apiCall('restoreDeletedEvent', item.eventId);
-            showToast(res.message, 'success');
-            await openWeeklyTrashModal();
-            await loadWeeklySchedule();
-            refreshLiveGatheringEvents();
-          } catch (e) {
-            showToast(e.message || 'Unable to restore gathering.', 'error');
-          }
+        restoreBtn.onclick = (e) => {
+          window.runButtonAction(e.currentTarget, async () => {
+            try {
+              const res = await apiCall('restoreDeletedEvent', item.eventId);
+              showToast(res.message, 'success');
+              await openWeeklyTrashModal();
+              await loadWeeklySchedule();
+              refreshLiveGatheringEvents();
+            } catch (err) {
+              showToast(err.message || 'Unable to restore gathering.', 'error');
+            }
+          }, 'Restoring...');
         };
         tdAct.appendChild(restoreBtn);
         tr.append(tdId, tdName, tdDate, tdAct);
@@ -226,23 +242,25 @@
       schedulesList.forEach(item => {
         const tr = document.createElement('tr');
         const tdId = document.createElement('td'); tdId.className = 'id-cell'; tdId.textContent = item.scheduleId;
-        const schedLabel = [item.name, item.dayOfWeek, item.time ? formatScheduleTime(item.time) : ''].filter(Boolean).join(' · ');
+        const schedLabel = [formatScheduleName(item.name), item.dayOfWeek, item.time ? formatScheduleTime(item.time) : ''].filter(Boolean).join(' · ');
         const tdName = document.createElement('td'); tdName.innerHTML = `<strong>${escapeHtml(schedLabel)}</strong> <small style="color:var(--muted);">(Schedule)</small>`;
         const tdDate = document.createElement('td'); tdDate.textContent = item.deletedAt || 'Recently';
         const tdAct = document.createElement('td');
         const restoreBtn = document.createElement('button');
         restoreBtn.className = 'module-button success-outline';
         restoreBtn.innerHTML = '<span class="material-symbols-rounded">restore_from_trash</span>Restore';
-        restoreBtn.onclick = async () => {
-          try {
-            const res = await apiCall('restoreDeletedSchedule', item.scheduleId);
-            showToast(res.message, 'success');
-            await openWeeklyTrashModal();
-            await loadWeeklySchedule();
-            refreshLiveGatheringEvents();
-          } catch (e) {
-            showToast(e.message || 'Unable to restore schedule.', 'error');
-          }
+        restoreBtn.onclick = (e) => {
+          window.runButtonAction(e.currentTarget, async () => {
+            try {
+              const res = await apiCall('restoreDeletedSchedule', item.scheduleId);
+              showToast(res.message, 'success');
+              await openWeeklyTrashModal();
+              await loadWeeklySchedule();
+              refreshLiveGatheringEvents();
+            } catch (err) {
+              showToast(err.message || 'Unable to restore schedule.', 'error');
+            }
+          }, 'Restoring...');
         };
         tdAct.appendChild(restoreBtn);
         tr.append(tdId, tdName, tdDate, tdAct);
@@ -254,7 +272,7 @@
   }
 
   function bindWeeklySchedulePage() {
-    document.getElementById('weekly-trash-button').addEventListener('click', openWeeklyTrashModal);
+    document.getElementById('weekly-trash-button').addEventListener('click', event => window.runButtonAction(event.currentTarget, openWeeklyTrashModal, 'Opening...'));
     document.getElementById('schedule-prev-week').addEventListener('click',()=>{weeklyScheduleState.weekOffset-=1;renderWeeklySchedule();});
     document.getElementById('schedule-next-week').addEventListener('click',()=>{weeklyScheduleState.weekOffset+=1;renderWeeklySchedule();});
     document.getElementById('schedule-today').addEventListener('click',()=>{weeklyScheduleState.weekOffset=0;renderWeeklySchedule();});

@@ -744,7 +744,7 @@ function attendanceGetRecords_(startDate, endDate) {
       memberName: get('memberName'),
       eventName: get('eventName'),
       eventDate: date || 'Not recorded',
-      schedule: get('schedule'),
+      schedule: attendanceFormatScheduleName_(get('schedule')),
       status: get('status'),
       recordedBy: get('recordedBy'),
       recordedAt: get('recordedAt'),
@@ -778,6 +778,87 @@ function getTodayAttendanceSummary() {
   return summary;
 }
 
+/**
+ * ============================================================================
+ * GATHERING CYCLES & MULTI-BATCH DOMAIN ARCHITECTURE
+ * ============================================================================
+ */
+
+function getGatheringCycleConfig_(eventName) {
+  const norm = String(eventName || '').trim().toLowerCase();
+  if (norm.includes('prayer meeting')) {
+    return {
+      type: 'recurring',
+      name: 'Prayer Meeting',
+      cycleStartDay: 3, // Wednesday
+      cycleSpanDays: 1, // Wednesday (3:30 AM) through Thursday (7:00 PM)
+      batches: [
+        { day: 'Wednesday', time: '3:30 AM', name: 'Wednesday 3:30 AM', mpro: 'S. Joy Ann / S. Eunice (w/ zoom)', officers: 'B. Francis / B. Henry / S. Julianne' },
+        { day: 'Wednesday', time: '7:00 AM', name: 'Wednesday 7:00 AM', mpro: 'B. Mark MJ / B. Riyadh (w/ zoom)', officers: 'B. Chito / S. Luz Igay' },
+        { day: 'Wednesday', time: '5:30 PM', name: 'Wednesday 5:30 PM', mpro: 'S. Eunice / S. Florwyn', officers: 'B. Donderick / B. Manny' },
+        { day: 'Thursday', time: '7:00 AM', name: 'Thursday 7:00 AM', mpro: 'S. Joy / B. Riyadh', officers: 'B. Edwin C.' },
+        { day: 'Thursday', time: '7:00 PM', name: 'Thursday 7:00 PM', mpro: 'B. Orven / B. EJ / B. Vince (w/ zoom)', officers: 'B. Leo' }
+      ]
+    };
+  }
+  if (norm.includes('worship service')) {
+    return {
+      type: 'recurring',
+      name: 'Worship Service',
+      cycleStartDay: 6, // Saturday
+      cycleSpanDays: 1, // Saturday (3:30 AM) through Sunday (12:00 PM)
+      batches: [
+        { day: 'Saturday', time: '3:30 AM', name: 'Saturday 3:30 AM', mpro: 'S. Joy Ann / S. Eunice (w/ zoom)', officers: 'B. Francis / B. Edgar / B. Henry / S. Julianne' },
+        { day: 'Saturday', time: '7:00 AM', name: 'Saturday 7:00 AM', mpro: 'B. MJ / B. Riyadh / B. Vince (w/ zoom)', officers: 'B. Manny / S. Grace Ann' },
+        { day: 'Saturday', time: '11:30 AM', name: 'Saturday 11:30 AM', mpro: 'B. Erhize / S. Florwyn (substitute)', officers: 'B. Osbie / S. Lina / S. Mai / S. Cristel' },
+        { day: 'Sunday', time: '12:00 PM', name: 'Sunday 12:00 PM', mpro: 'B. Orven / S. Joy / B. Riyadh', officers: 'B. Dennis / B. Chito / S. Hazel' }
+      ]
+    };
+  }
+  if (norm.includes('thanksgiving')) {
+    return {
+      type: 'recurring',
+      name: 'Thanksgiving',
+      cycleStartDay: 6, // Saturday
+      cycleSpanDays: 2, // Saturday (4:00 PM) through Monday (8:30 AM)
+      batches: [
+        { day: 'Saturday', time: '4:00 PM', name: 'Saturday 4:00 PM', mpro: 'All Available MPRO (w/ zoom)', officers: 'B. Osbie / S. Ofel' },
+        { day: 'Sunday', time: '5:00 AM', name: 'Sunday 5:00 AM', mpro: 'S. Joy (set up), B. Orven / B. MJ / S. Eunice (inc. GA, Caravan)', officers: 'B. Edd Sumawang / B. Virgelio / B. Chito' },
+        { day: 'Monday', time: '8:30 AM', name: 'Monday 8:30 AM', mpro: 'B. Remo', officers: 'B. Gener / B. Edwin C. / B. Edwin G.' }
+      ]
+    };
+  }
+  return null;
+}
+
+function getGatheringCycleRange_(eventName, dateKey) {
+  const normDate = attendanceDateKey_(dateKey);
+  if (!normDate || normDate === 'Not recorded') {
+    return { startDate: normDate, endDate: normDate, key: normDate };
+  }
+  const config = getGatheringCycleConfig_(eventName);
+  if (!config) {
+    return { startDate: normDate, endDate: normDate, key: normDate };
+  }
+
+  const parts = normDate.split('-').map(Number);
+  const d = new Date(Date.UTC(parts[0], parts[1] - 1, parts[2], 12));
+  const dayOfWeek = d.getUTCDay(); // 0 = Sun, 1 = Mon, ..., 6 = Sat
+
+  // Days to subtract to reach the preceding cycle start day
+  const daysToSubtract = (dayOfWeek - config.cycleStartDay + 7) % 7;
+  const startMs = d.getTime() - daysToSubtract * 24 * 60 * 60 * 1000;
+  const startDate = attendanceDateKey_(new Date(startMs));
+  const endMs = startMs + config.cycleSpanDays * 24 * 60 * 60 * 1000;
+  const endDate = attendanceDateKey_(new Date(endMs));
+
+  return {
+    startDate: startDate,
+    endDate: endDate,
+    key: startDate
+  };
+}
+
 function getGatheringAttendanceSummary(eventId, eventDate, scheduleId) {
   requireAttendanceAccess_();
   const id = String(eventId || '').trim();
@@ -794,11 +875,8 @@ function getGatheringAttendanceSummary(eventId, eventDate, scheduleId) {
   const selectedStart = attendanceScheduleOccurrenceAt_(selectedSchedule, date);
   if (selectedStart === null) throw new Error('The selected date does not match this gathering schedule.');
 
-  const monthStart = `${date.slice(0, 7)}-01`;
-  const previousGatheringStart = attendancePreviousGatheringStart_(events, id, selectedStart, monthStart, date);
-  const firstDate = previousGatheringStart === null
-    ? monthStart
-    : new Date(previousGatheringStart).toISOString().slice(0, 10);
+  const cycle = getGatheringCycleRange_(event.name, date);
+  const firstDate = cycle.startDate;
   const batches = [];
   const batchByKey = Object.create(null);
   const daysToCheck = attendanceDaysBetween_(firstDate, date);
@@ -806,8 +884,7 @@ function getGatheringAttendanceSummary(eventId, eventDate, scheduleId) {
     const batchDate = attendanceAddDays_(firstDate, dayOffset);
     (event.schedules || []).forEach(schedule => {
       const startsAt = attendanceScheduleOccurrenceAt_(schedule, batchDate);
-      if (startsAt === null || startsAt > selectedStart ||
-          (previousGatheringStart !== null && startsAt <= previousGatheringStart)) return;
+      if (startsAt === null || startsAt > selectedStart) return;
       const key = `${String(schedule.scheduleId)}|${batchDate}`;
       if (batchByKey[key]) return;
       const batch = {
@@ -815,14 +892,20 @@ function getGatheringAttendanceSummary(eventId, eventDate, scheduleId) {
         scheduleIds: (schedule.scheduleIds || [schedule.scheduleId]).map(String),
         date: batchDate,
         at: startsAt,
-        name: schedule.name || 'Schedule'
+        name: attendanceFormatScheduleName_(schedule.name || 'Schedule')
       };
       batchByKey[key] = batch;
       batches.push(batch);
     });
   }
   if (!batchByKey[`${selectedScheduleId}|${date}`]) {
-    throw new Error('The selected gathering schedule is not part of the current attendance period.');
+    batches.push({
+      scheduleId: selectedScheduleId,
+      scheduleIds: [selectedScheduleId],
+      date: date,
+      at: selectedStart,
+      name: attendanceFormatScheduleName_(selectedSchedule.name || 'Schedule')
+    });
   }
   batches.sort((first, second) => first.at - second.at);
 
@@ -838,8 +921,10 @@ function getGatheringAttendanceSummary(eventId, eventDate, scheduleId) {
   batches.forEach(batch => {
     const batchKey = `${batch.scheduleId}|${batch.date}`;
     batchNames[batchKey] = batch.name;
-    batch.scheduleIds.forEach(scheduleId => { recordBatchBySchedule[`${scheduleId}|${batch.date}`] = batchKey; });
+    batch.scheduleIds.forEach(schId => { recordBatchBySchedule[`${schId}|${batch.date}`] = batchKey; });
   });
+
+  // Pull all records from the start of this cycle through the current date
   attendanceGetRecords_(firstDate, date).filter(record =>
     record.eventId === id && Boolean(recordBatchBySchedule[`${String(record.scheduleId || '')}|${record.eventDate}`])
   ).forEach(record => {
@@ -889,7 +974,7 @@ function getGatheringAttendanceSummary(eventId, eventDate, scheduleId) {
     date: date,
     batchCount: batches.length,
     batches: batches.map(batch => ({ date: batch.date, name: batch.name })),
-    throughSchedule: selectedSchedule.name || 'Schedule',
+    throughSchedule: attendanceFormatScheduleName_(selectedSchedule.name || 'Schedule'),
     activeMembers: activeMembers.length,
     present: counts.Present,
     late: counts.Late,
@@ -971,6 +1056,22 @@ function attendanceNormalizeTime_(value, label, required) {
   const period = hour < 12 ? 'AM' : 'PM';
   const displayHour = hour % 12 || 12;
   return `${displayHour}:${String(minute).padStart(2, '0')} ${period}`;
+}
+
+function attendanceFormatTime12_(value) {
+  const text = String(value || '').trim();
+  if (!text) return '';
+  try {
+    return attendanceNormalizeTime_(text, 'Time', false) || text;
+  } catch (error) {
+    return text;
+  }
+}
+
+function attendanceFormatScheduleName_(value) {
+  return String(value || '').trim().replace(/\b(\d{1,2})(?::(\d{2}))?\s*(AM|PM)\b|\b(\d{1,2}:\d{2})\b/gi, match => {
+    return attendanceFormatTime12_(match) || match;
+  });
 }
 
 function attendanceScheduleTimeKey_(value) {
@@ -1104,7 +1205,12 @@ function attendanceIsPresent_(status) {
 }
 
 function attendanceEventKey_(record) {
-  return [record.eventId || record.eventName || record.eventDate, record.scheduleId || record.schedule || '', record.eventDate || ''].join('|');
+  if (!record) return '';
+  const eventId = String(record.eventId || record.eventName || '').trim();
+  const dateKey = attendanceDateKey_(record.eventDate);
+  if (!eventId || !dateKey || dateKey === 'Not recorded') return '';
+  const range = getGatheringCycleRange_(record.eventName || eventId, dateKey);
+  return `${eventId}|${range.startDate}`;
 }
 
 function attendanceCountBy_(members, key, splitValues) {
@@ -1484,32 +1590,44 @@ function ensureDefaultGatheringSchedulesLocked_() {
   });
 
   const scheduleSeeds = [
-    ['Prayer Meeting', 'Wednesday', '03:30', 'S. Joy Ann / S. Eunice (w/ zoom)', 'B. Francis / B. Henry / S. Julianne'],
-    ['Prayer Meeting', 'Wednesday', '07:00', 'B. Mark MJ / B. Riyadh (w/ zoom)', 'B. Chito / S. Luz Igay'],
-    ['Prayer Meeting', 'Wednesday', '17:30', 'S. Eunice / S. Florwyn', 'B. Donderick / B. Manny'],
-    ['Prayer Meeting', 'Thursday', '07:00', 'S. Joy / B. Riyadh', 'B. Edwin C.'],
-    ['Prayer Meeting', 'Thursday', '19:00', 'B. Orven / B. EJ / B. Vince (w/ zoom)', 'B. Leo'],
-    ['Worship Service', 'Saturday', '03:30', 'S. Joy Ann / S. Eunice (w/ zoom)', 'B. Francis / B. Edgar / B. Henry / S. Julianne'],
-    ['Worship Service', 'Saturday', '07:00', 'B. MJ / B. Riyadh / B. Vince (w/ zoom)', 'B. Manny / S. Grace Ann'],
-    ['Worship Service', 'Saturday', '11:30', 'B. Erhize / S. Florwyn (substitute)', 'B. Osbie / S. Lina / S. Mai / S. Cristel'],
-    ['Worship Service', 'Sunday', '12:00', 'B. Orven / S. Joy / B. Riyadh', 'B. Dennis / B. Chito / S. Hazel'],
-    ['Thanksgiving', 'Saturday', '16:00', 'All Available MPRO (w/ zoom)', 'B. Osbie / S. Ofel'],
-    ['Thanksgiving', 'Sunday', '05:00', 'S. Joy (set up), B. Orven / B. MJ / S. Eunice (inc. GA, Caravan)', 'B. Edd Sumawang / B. Virgelio / B. Chito'],
-    ['Thanksgiving', 'Monday', '08:30', 'B. Remo', 'B. Gener / B. Edwin C. / B. Edwin G.']
+    ['Prayer Meeting', 'Wednesday', '3:30 AM', 'S. Joy Ann / S. Eunice (w/ zoom)', 'B. Francis / B. Henry / S. Julianne'],
+    ['Prayer Meeting', 'Wednesday', '7:00 AM', 'B. Mark MJ / B. Riyadh (w/ zoom)', 'B. Chito / S. Luz Igay'],
+    ['Prayer Meeting', 'Wednesday', '5:30 PM', 'S. Eunice / S. Florwyn', 'B. Donderick / B. Manny'],
+    ['Prayer Meeting', 'Thursday', '7:00 AM', 'S. Joy / B. Riyadh', 'B. Edwin C.'],
+    ['Prayer Meeting', 'Thursday', '7:00 PM', 'B. Orven / B. EJ / B. Vince (w/ zoom)', 'B. Leo'],
+    ['Worship Service', 'Saturday', '3:30 AM', 'S. Joy Ann / S. Eunice (w/ zoom)', 'B. Francis / B. Edgar / B. Henry / S. Julianne'],
+    ['Worship Service', 'Saturday', '7:00 AM', 'B. MJ / B. Riyadh / B. Vince (w/ zoom)', 'B. Manny / S. Grace Ann'],
+    ['Worship Service', 'Saturday', '11:30 AM', 'B. Erhize / S. Florwyn (substitute)', 'B. Osbie / S. Lina / S. Mai / S. Cristel'],
+    ['Worship Service', 'Sunday', '12:00 PM', 'B. Orven / S. Joy / B. Riyadh', 'B. Dennis / B. Chito / S. Hazel'],
+    ['Thanksgiving', 'Saturday', '4:00 PM', 'All Available MPRO (w/ zoom)', 'B. Osbie / S. Ofel'],
+    ['Thanksgiving', 'Sunday', '5:00 AM', 'S. Joy (set up), B. Orven / B. MJ / S. Eunice (inc. GA, Caravan)', 'B. Edd Sumawang / B. Virgelio / B. Chito'],
+    ['Thanksgiving', 'Monday', '8:30 AM', 'B. Remo', 'B. Gener / B. Edwin C. / B. Edwin G.']
   ];
   const scheduleColumns = attendanceScheduleSchema_(scheduleHeaders);
   const existing = scheduleSheet.getLastRow() > 1
     ? scheduleSheet.getRange(2, 1, scheduleSheet.getLastRow() - 1, scheduleHeaders.length).getDisplayValues()
     : [];
   const existingKeys = Object.create(null);
-  existing.forEach(row => {
-    const normalizedTime = attendanceScheduleTimeKey_(row[scheduleColumns.time]);
+  existing.forEach((row, rIdx) => {
+    const rawTime = row[scheduleColumns.time];
+    const rawName = row[scheduleColumns.name];
+    const normalizedTime = attendanceScheduleTimeKey_(rawTime);
     const key = [
       String(row[scheduleColumns.eventId] || '').trim().toLowerCase(),
       String(row[scheduleColumns.dayOfWeek] || '').trim().toLowerCase(),
       normalizedTime
     ].join('|');
     if (key.replace(/\|/g, '')) existingKeys[key] = true;
+
+    // Migrate any military or 24-hour times in existing spreadsheet rows to friendly 12-hour AM/PM
+    const formattedTime = attendanceFormatTime12_(rawTime);
+    const formattedName = attendanceFormatScheduleName_(rawName);
+    if (formattedTime && formattedTime !== rawTime && scheduleColumns.time >= 0) {
+      scheduleSheet.getRange(rIdx + 2, scheduleColumns.time + 1).setValue(formattedTime);
+    }
+    if (formattedName && formattedName !== rawName && scheduleColumns.name >= 0) {
+      scheduleSheet.getRange(rIdx + 2, scheduleColumns.name + 1).setValue(formattedName);
+    }
   });
   scheduleSeeds.forEach(seed => {
     const eventId = eventIdByName[seed[0]];
@@ -1565,14 +1683,17 @@ function getAttendanceEvents() {
     if (!eventsById[eventId]) {
       eventsById[eventId] = { eventId: eventId, name: eventId, category: '', date: '', endDate: '', location: '', description: '', status: 'Ongoing', schedules: [] };
     }
+    const rawTime = get('time');
+    const rawEndTime = get('endTime');
+    const rawName = get('name') || 'Schedule';
     eventsById[eventId].schedules.push({
       scheduleId: get('id'),
       scheduleIds: get('id') ? [String(get('id'))] : [],
-      name: get('name') || 'Schedule',
+      name: attendanceFormatScheduleName_(rawName),
       date: attendanceDateKey_(row[scheduleSchema.date]) || eventsById[eventId].date,
       dayOfWeek: get('dayOfWeek'),
-      time: get('time'),
-      endTime: get('endTime'),
+      time: attendanceFormatTime12_(rawTime),
+      endTime: attendanceFormatTime12_(rawEndTime),
       location: get('location') || eventsById[eventId].location,
       notes: get('notes'),
       mproIncharge: get('mproIncharge'),
@@ -2346,102 +2467,227 @@ function getEventHistory() {
   }
 
   const today = attendanceDateKey_(new Date());
-  const occurrences = Object.create(null);
-  const getOccurrence = (eventId, scheduleId, dateKey) => {
-    if (!eventId || !dateKey || dateKey > today) return null;
-    const key = [eventId, scheduleId || '', dateKey].join('|');
-    if (trashedOccurrences.has(key)) return null;
-    const event = eventById[eventId] || { name: eventId, category: 'Event', location: '', description: '', program: '' };
-    const schedule = scheduleByKey[`${eventId}|${scheduleId}`] || {};
-    if (!occurrences[key]) {
-      occurrences[key] = {
-        key: key,
+  const cycles = Object.create(null);
+  const records = attendanceGetRecords_();
+
+  const getOrCreateCycle = (eventId, eventName, dateKey) => {
+    const range = getGatheringCycleRange_(eventName, dateKey);
+    const cycleKey = `${eventId}|${range.startDate}`;
+    if (trashedOccurrences.has(cycleKey)) return null;
+
+    if (!cycles[cycleKey]) {
+      const event = eventById[eventId] || { eventId: eventId, name: eventName || eventId, category: 'Gathering' };
+      const config = getGatheringCycleConfig_(event.name);
+      cycles[cycleKey] = {
+        key: cycleKey,
+        cycleKey: cycleKey,
         eventId: eventId,
-        scheduleId: scheduleId || '',
         eventName: event.name || eventId,
-        category: event.category || 'Event',
-        eventDate: dateKey,
-        scheduleName: schedule.name || event.name || 'Schedule',
-        time: schedule.time || '',
-        location: schedule.location || event.location || '',
-        mproIncharge: schedule.mproIncharge || '',
-        officersAssigned: schedule.officersAssigned || '',
+        category: event.category || 'Gathering',
+        startDate: range.startDate,
+        endDate: range.endDate,
+        eventDate: range.endDate,
+        dateRange: range.startDate === range.endDate ? range.startDate : `${range.startDate} to ${range.endDate}`,
         description: event.description || '',
         program: event.program || '',
+        isRecurring: Boolean(config),
+        batchesMap: Object.create(null),
+        memberMap: Object.create(null),
         attendanceCount: 0,
+        totalMarks: 0,
         present: 0,
         absent: 0,
         late: 0,
         excused: 0
       };
+
+      if (config) {
+        config.batches.forEach(bSeed => {
+          const daysFromStart = (bSeed.day === 'Wednesday' ? 0 : bSeed.day === 'Thursday' ? 1 : bSeed.day === 'Saturday' ? 0 : bSeed.day === 'Sunday' ? 1 : bSeed.day === 'Monday' ? 2 : 0);
+          const bDate = attendanceAddDays_(range.startDate, daysFromStart);
+          const bKey = `${bSeed.day}|${attendanceScheduleTimeKey_(bSeed.time)}`;
+          cycles[cycleKey].batchesMap[bKey] = {
+            key: bKey,
+            name: attendanceFormatScheduleName_(bSeed.name),
+            day: bSeed.day,
+            time: attendanceFormatTime12_(bSeed.time),
+            date: bDate,
+            mproIncharge: bSeed.mpro,
+            officersAssigned: bSeed.officers,
+            attendanceCount: 0
+          };
+        });
+      }
     }
-    return occurrences[key];
+    return cycles[cycleKey];
   };
 
-  attendanceGetRecords_().forEach(record => {
-    const occurrence = getOccurrence(record.eventId, record.scheduleId, record.eventDate);
-    if (!occurrence) return;
-    occurrence.attendanceCount += 1;
-    const status = String(record.status || '').trim().toLowerCase();
-    if (status === 'present') occurrence.present += 1;
-    else if (status === 'absent') occurrence.absent += 1;
-    else if (status === 'late') occurrence.late += 1;
-    else if (status === 'excused') occurrence.excused += 1;
+  const statusPriority = { Present: 4, Late: 3, Excused: 2, Absent: 1 };
+
+  records.forEach(record => {
+    const event = eventById[record.eventId] || { name: record.eventName || record.eventId };
+    const cycle = getOrCreateCycle(record.eventId, event.name, record.eventDate);
+    if (!cycle) return;
+
+    cycle.totalMarks += 1;
+    const mId = String(record.memberId || '').trim();
+    const rawStatus = String(record.status || '').trim();
+    const status = /^(late|tardy)$/i.test(rawStatus) ? 'Late'
+      : attendanceIsPresent_(rawStatus) ? 'Present'
+      : /^absent$/i.test(rawStatus) ? 'Absent'
+      : /^excused$/i.test(rawStatus) ? 'Excused'
+      : rawStatus || 'Present';
+
+    const schedule = scheduleByKey[`${record.eventId}|${record.scheduleId}`] || {};
+    const rawBatchName = record.schedule || schedule.name || (record.scheduleId ? 'Schedule' : '');
+    const batchName = attendanceFormatScheduleName_(rawBatchName);
+    const batchKey = schedule.dayOfWeek && schedule.time ? `${schedule.dayOfWeek}|${attendanceScheduleTimeKey_(schedule.time)}` : (batchName || record.scheduleId || record.eventDate);
+
+    if (!cycle.batchesMap[batchKey]) {
+      cycle.batchesMap[batchKey] = {
+        key: batchKey,
+        name: batchName || 'General',
+        day: schedule.dayOfWeek || '',
+        time: attendanceFormatTime12_(schedule.time) || '',
+        date: record.eventDate,
+        mproIncharge: schedule.mproIncharge || '',
+        officersAssigned: schedule.officersAssigned || '',
+        attendanceCount: 0
+      };
+    }
+    cycle.batchesMap[batchKey].attendanceCount += 1;
+
+    if (mId) {
+      if (!cycle.memberMap[mId]) {
+        cycle.memberMap[mId] = {
+          memberId: mId,
+          status: status,
+          priority: statusPriority[status] || 0,
+          batches: new Set(batchName ? [batchName] : [])
+        };
+      } else {
+        const mem = cycle.memberMap[mId];
+        if (batchName) mem.batches.add(batchName);
+        if ((statusPriority[status] || 0) > mem.priority) {
+          mem.status = status;
+          mem.priority = statusPriority[status] || 0;
+        }
+      }
+    }
   });
 
+  // Include past schedules if any that didn't have records yet
   events.forEach(event => (event.schedules || []).forEach(schedule => {
     const dateKey = attendanceInputDateKey_(schedule.date || event.date);
-    if (dateKey && dateKey < today) getOccurrence(event.eventId, schedule.scheduleId, dateKey);
+    if (dateKey && dateKey < today) getOrCreateCycle(event.eventId, event.name, dateKey);
   }));
-  return Object.keys(occurrences).map(key => occurrences[key]).sort((a, b) =>
-    b.eventDate.localeCompare(a.eventDate) || a.time.localeCompare(b.time) || a.eventName.localeCompare(b.eventName)
-  );
+
+  return Object.keys(cycles).map(key => {
+    const c = cycles[key];
+    const uniqueMembers = Object.values(c.memberMap);
+    c.attendanceCount = uniqueMembers.length;
+    uniqueMembers.forEach(mem => {
+      if (mem.status === 'Present') c.present += 1;
+      else if (mem.status === 'Late') c.late += 1;
+      else if (mem.status === 'Absent') c.absent += 1;
+      else if (mem.status === 'Excused') c.excused += 1;
+    });
+
+    c.batches = Object.values(c.batchesMap).sort((a, b) =>
+      (a.date || '').localeCompare(b.date || '') || (a.time || '').localeCompare(b.time || '')
+    );
+    c.batchCount = c.batches.length;
+
+    if (c.isRecurring && c.batches.length > 0) {
+      const firstB = c.batches[0];
+      const lastB = c.batches[c.batches.length - 1];
+      c.scheduleName = `${c.batches.length} batches (${firstB.name} – ${lastB.name})`;
+    } else {
+      c.scheduleName = c.batches[0] ? c.batches[0].name : 'Schedule';
+    }
+
+    return c;
+  }).sort((a, b) => b.startDate.localeCompare(a.startDate) || a.eventName.localeCompare(b.eventName));
 }
 
-function getEventHistoryDetails(eventId, scheduleId, eventDate) {
+function getEventHistoryDetails(cycleKey, scheduleId, eventDate) {
   requireAttendanceAccess_();
-  const dateKey = attendanceInputDateKey_(eventDate);
-  const occurrence = getEventHistory().find(item => item.eventId === String(eventId || '') &&
-    String(item.scheduleId || '') === String(scheduleId || '') && item.eventDate === dateKey);
-  if (!occurrence) throw new Error('That event history record was not found. Refresh and select it again.');
-  const records = attendanceGetRecords_(dateKey, dateKey).filter(record => record.eventId === occurrence.eventId &&
-    String(record.scheduleId || '') === String(occurrence.scheduleId || ''));
+  const historyList = getEventHistory();
+  let cycle = historyList.find(item => item.key === String(cycleKey || '') || item.cycleKey === String(cycleKey || ''));
+  if (!cycle && eventDate) {
+    const range = getGatheringCycleRange_('', eventDate);
+    const targetKey = `${cycleKey}|${range.startDate}`;
+    cycle = historyList.find(item => item.key === targetKey);
+  }
+  if (!cycle) {
+    cycle = historyList.find(item => item.eventId === String(cycleKey || '') &&
+      (item.startDate <= eventDate && item.endDate >= eventDate));
+  }
+  if (!cycle) throw new Error('That gathering history record was not found. Refresh and select it again.');
+
+  const records = attendanceGetRecords_(cycle.startDate, cycle.endDate).filter(record => record.eventId === cycle.eventId);
   const members = getAllMembers();
   const memberById = Object.create(null);
   members.forEach(member => { memberById[member.memberId] = member; });
-  return {
-    event: occurrence,
-    attendees: records.map(record => {
-      const member = memberById[record.memberId] || null;
-      return {
-        memberId: record.memberId,
-        name: record.memberName || (member && member.name) || 'Name not recorded',
-        status: record.status || 'Not recorded',
-        recordedBy: record.recordedBy || '',
-        recordedAt: record.recordedAt || '',
-        contactNumber: member ? member.contactNumber : '',
-        category: member ? member.category : '',
-        membershipStatus: member ? member.membershipStatus : '',
-        studentStatus: member ? member.studentStatus : '',
-        employmentStatus: member ? member.employmentStatus : '',
-        committees: member ? member.committees : '',
-        member: member
+
+  const statusPriority = { Present: 4, Late: 3, Excused: 2, Absent: 1 };
+  const memberAttendees = Object.create(null);
+
+  records.forEach(rec => {
+    const mId = String(rec.memberId || '').trim();
+    if (!mId) return;
+    const rawStatus = String(rec.status || '').trim();
+    const status = /^(late|tardy)$/i.test(rawStatus) ? 'Late'
+      : attendanceIsPresent_(rawStatus) ? 'Present'
+      : /^absent$/i.test(rawStatus) ? 'Absent'
+      : /^excused$/i.test(rawStatus) ? 'Excused'
+      : rawStatus || 'Present';
+
+    const batchName = attendanceFormatScheduleName_(rec.schedule || (rec.scheduleId ? 'Schedule' : ''));
+    if (!memberAttendees[mId]) {
+      const m = memberById[mId];
+      memberAttendees[mId] = {
+        memberId: mId,
+        name: rec.memberName || (m && m.name) || 'Name not recorded',
+        status: status,
+        priority: statusPriority[status] || 0,
+        contactNumber: m ? m.contactNumber : '',
+        category: m ? m.category : '',
+        membershipStatus: m ? m.membershipStatus : '',
+        studentStatus: m ? m.studentStatus : '',
+        employmentStatus: m ? m.employmentStatus : '',
+        committees: m ? m.committees : '',
+        recordedBy: rec.recordedBy || '',
+        recordedAt: rec.recordedAt || '',
+        attendedBatches: batchName ? [batchName] : [],
+        batchNames: batchName || '',
+        member: m
       };
-    }).sort((a, b) => a.name.localeCompare(b.name))
+    } else {
+      const existing = memberAttendees[mId];
+      if (batchName && existing.attendedBatches.indexOf(batchName) < 0) {
+        existing.attendedBatches.push(batchName);
+        existing.batchNames = existing.attendedBatches.join(', ');
+      }
+      if ((statusPriority[status] || 0) > existing.priority) {
+        existing.status = status;
+        existing.priority = statusPriority[status] || 0;
+      }
+    }
+  });
+
+  return {
+    event: cycle,
+    batches: cycle.batches,
+    attendees: Object.values(memberAttendees).sort((a, b) => a.name.localeCompare(b.name))
   };
 }
 
-/**
- * Deletes / Archives a past event occurrence and its saved attendance records into DELETED_EVENT_HISTORY.
- * Retains records for 30 days before permanent deletion.
- * Automatically recalculates member attendance rollups.
- */
 function deleteEventHistoryOccurrence(eventId, scheduleId, eventDate) {
   requireAttendanceAccess_();
   const eId = String(eventId || '').trim();
-  const sId = String(scheduleId || '').trim();
   const dateKey = attendanceInputDateKey_(eventDate);
-  if (!eId || !dateKey) throw new Error('Event ID and Event Date are required to delete a past event.');
+  if (!eId || !dateKey) throw new Error('Event ID and Event Date are required to delete a past gathering.');
 
   const ss = getAttendanceSpreadsheet_();
   const recordSheet = ss.getSheetByName('ATTENDANCE_RECORDS');
@@ -2453,12 +2699,11 @@ function deleteEventHistoryOccurrence(eventId, scheduleId, eventDate) {
     const recHeaders = recordSheet.getRange(1, 1, 1, recordSheet.getLastColumn()).getDisplayValues()[0];
     const recSchema = attendanceRecordSchema_(recHeaders);
 
-    const occurrences = getEventHistory();
-    const occurrence = occurrences.find(item => item.eventId === eId &&
-      String(item.scheduleId || '') === sId && item.eventDate === dateKey);
-
-    const eventName = occurrence ? occurrence.eventName : eId;
-    const scheduleName = occurrence ? occurrence.scheduleName : sId;
+    const events = getAttendanceEvents();
+    const event = events.find(ev => ev.eventId === eId);
+    const eventName = event ? event.name : eId;
+    const cycle = getGatheringCycleRange_(eventName, dateKey);
+    const occurrenceKey = `${eId}|${cycle.startDate}`;
 
     let trash = ss.getSheetByName('DELETED_EVENT_HISTORY');
     if (!trash) {
@@ -2470,8 +2715,6 @@ function deleteEventHistoryOccurrence(eventId, scheduleId, eventDate) {
       trash.setFrozenRows(1);
     }
     const trashHeaders = trash.getRange(1, 1, 1, trash.getLastColumn()).getDisplayValues()[0];
-
-    const occurrenceKey = [eId, sId, dateKey].join('|');
     const archiveId = 'ARCH-HIST-' + Utilities.formatDate(new Date(), Session.getScriptTimeZone() || 'Asia/Manila', 'yyyyMMdd-HHmmss') + '-' + Math.floor(Math.random() * 1000);
 
     const matchedRows = [];
@@ -2480,14 +2723,12 @@ function deleteEventHistoryOccurrence(eventId, scheduleId, eventDate) {
       for (let i = recRows.length - 1; i >= 0; i--) {
         const row = recRows[i];
         const rowEId = String(row[recSchema.eventId] || '').trim();
-        const rowSId = String(row[recSchema.scheduleId] || '').trim();
         const rowDate = attendanceDateKey_(row[recSchema.eventDate]);
 
         const matchesEvent = rowEId === eId;
-        const matchesDate = rowDate === dateKey;
-        const matchesSchedule = !sId || !rowSId || rowSId === sId;
+        const matchesCycle = rowDate >= cycle.startDate && rowDate <= cycle.endDate;
 
-        if (matchesEvent && matchesDate && matchesSchedule) {
+        if (matchesEvent && matchesCycle) {
           matchedRows.push(row);
           recordSheet.deleteRow(i + 2);
         }
@@ -2504,10 +2745,10 @@ function deleteEventHistoryOccurrence(eventId, scheduleId, eventDate) {
     setCol('Archive ID', archiveId);
     setCol('Occurrence Key', occurrenceKey);
     setCol('Event ID', eId);
-    setCol('Schedule ID', sId);
+    setCol('Schedule ID', scheduleId || '');
     setCol('Event Name', eventName);
-    setCol('Event Date', dateKey);
-    setCol('Schedule Name', scheduleName);
+    setCol('Event Date', `${cycle.startDate} to ${cycle.endDate}`);
+    setCol('Schedule Name', 'All Batches in Gathering Cycle');
     setCol('Record Count', matchedRows.length);
     setCol('Deleted At', new Date());
     setCol('Deleted By', Session.getActiveUser().getEmail() || 'Secretary');
@@ -2526,8 +2767,7 @@ function deleteEventHistoryOccurrence(eventId, scheduleId, eventDate) {
     logAction('TRASH_EVENT_HISTORY', {
       archiveId: archiveId,
       eventId: eId,
-      scheduleId: sId,
-      eventDate: dateKey,
+      cycleKey: occurrenceKey,
       count: matchedRows.length
     });
 
@@ -2535,7 +2775,7 @@ function deleteEventHistoryOccurrence(eventId, scheduleId, eventDate) {
       success: true,
       archiveId: archiveId,
       count: matchedRows.length,
-      message: `Past event "${eventName}" (${dateKey}) moved to Archive Trash (${matchedRows.length} attendance record(s)). Retained for 30 days.`
+      message: `Past gathering "${eventName}" (${cycle.startDate} to ${cycle.endDate}) moved to Archive Trash (${matchedRows.length} attendance marks). Retained for 30 days.`
     };
   } finally {
     lock.releaseLock();

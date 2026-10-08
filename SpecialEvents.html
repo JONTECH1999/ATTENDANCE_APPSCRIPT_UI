@@ -123,7 +123,7 @@
       delBtn.className = 'module-button danger-outline';
       delBtn.innerHTML = '<span class="material-symbols-rounded">delete</span>Archive Event';
       delBtn.title = 'Move to Archive Trash (retained 30 days before permanent delete)';
-      delBtn.addEventListener('click', () => archiveEventFromPage(event));
+      delBtn.addEventListener('click', (e) => archiveEventFromPage(event, e.currentTarget));
       actions.appendChild(delBtn);
 
       body.append(description, programLabel, program, actions);
@@ -132,15 +132,22 @@
     });
   }
 
-  async function archiveEventFromPage(event) {
+  async function archiveEventFromPage(event, triggerButton) {
     if (!window.confirm(`Move "${event.name}" (${event.eventId}) to Archive Trash?\n\nIt will be retained for 30 days, then permanently deleted.`)) return;
-    try {
-      const result = await apiCall('moveEventToTrash', event.eventId);
-      showToast(result.message, 'success');
-      await loadSpecialEvents();
-      refreshLiveGatheringEvents();
-    } catch (err) {
-      showToast(err.message || 'Unable to archive event.', 'error');
+    const action = async () => {
+      try {
+        const result = await apiCall('moveEventToTrash', event.eventId);
+        showToast(result.message, 'success');
+        await loadSpecialEvents();
+        refreshLiveGatheringEvents();
+      } catch (err) {
+        showToast(err.message || 'Unable to archive event.', 'error');
+      }
+    };
+    if (triggerButton && window.runButtonAction) {
+      await window.runButtonAction(triggerButton, action, 'Archiving...');
+    } else {
+      await action();
     }
   }
 
@@ -166,16 +173,18 @@
         const restoreBtn = document.createElement('button');
         restoreBtn.className = 'module-button success-outline';
         restoreBtn.innerHTML = '<span class="material-symbols-rounded">restore_from_trash</span>Restore';
-        restoreBtn.onclick = async () => {
-          try {
-            const res = await apiCall('restoreDeletedEvent', item.eventId);
-            showToast(res.message, 'success');
-            await openEventTrashModal();
-            await loadSpecialEvents();
-            refreshLiveGatheringEvents();
-          } catch (e) {
-            showToast(e.message || 'Unable to restore event.', 'error');
-          }
+        restoreBtn.onclick = (e) => {
+          window.runButtonAction(e.currentTarget, async () => {
+            try {
+              const res = await apiCall('restoreDeletedEvent', item.eventId);
+              showToast(res.message, 'success');
+              await openEventTrashModal();
+              await loadSpecialEvents();
+              refreshLiveGatheringEvents();
+            } catch (err) {
+              showToast(err.message || 'Unable to restore event.', 'error');
+            }
+          }, 'Restoring...');
         };
         tdAct.appendChild(restoreBtn);
         tr.append(tdId, tdName, tdDate, tdAct);
@@ -212,6 +221,6 @@
   }
 
   document.getElementById('create-special-event-button').addEventListener('click', openSpecialEventDialog);
-  document.getElementById('event-trash-button').addEventListener('click', openEventTrashModal);
+  document.getElementById('event-trash-button').addEventListener('click', event => window.runButtonAction(event.currentTarget, openEventTrashModal, 'Opening...'));
   document.getElementById('special-event-form').addEventListener('submit', submitSpecialEvent);
 </script>

@@ -125,7 +125,7 @@
       const actions = document.createElement('td'); actions.className = 'row-actions';
       const viewButton = actionButton('visibility', 'View member', () => showMemberDetails(member));
       viewButton.setAttribute('aria-expanded', String(membersPageState.expandedMember === member.memberId));
-      actions.append(viewButton, actionButton('edit', 'Edit member', () => openMemberEditor(member)), actionButton('inventory_2', 'Mark inactive', () => archiveMemberFromPage(member)), actionButton('delete', 'Move to Trash', () => trashMemberFromPage(member)));
+      actions.append(viewButton, actionButton('edit', 'Edit member', () => openMemberEditor(member)), actionButton('inventory_2', 'Mark inactive', (e) => archiveMemberFromPage(member, e.currentTarget)), actionButton('delete', 'Move to Trash', (e) => trashMemberFromPage(member, e.currentTarget)));
       row.append(id, name, birthday, sabbathDate, category, status, activity, committees, rate, last, actions); tbody.appendChild(row);
       if (membersPageState.expandedMember === member.memberId) tbody.appendChild(renderDirectoryMemberDetails(member));
     });
@@ -199,16 +199,40 @@
     }, payload.isEdit ? 'Updating...' : 'Saving...');
   }
 
-  async function archiveMemberFromPage(member) {
+  async function archiveMemberFromPage(member, triggerButton) {
     if (!window.confirm(`Mark ${member.memberId} as inactive?`)) return;
-    try { const result = await apiCall('archiveMember', member.memberId); showToast(result.message, 'success'); await loadMembersPage(); }
-    catch (error) { showToast(error.message || 'Unable to update member.', 'error'); }
+    const action = async () => {
+      try {
+        const result = await apiCall('archiveMember', member.memberId);
+        showToast(result.message, 'success');
+        await loadMembersPage();
+      } catch (error) {
+        showToast(error.message || 'Unable to update member.', 'error');
+      }
+    };
+    if (triggerButton && window.runButtonAction) {
+      await window.runButtonAction(triggerButton, action, 'Archiving...');
+    } else {
+      await action();
+    }
   }
 
-  async function trashMemberFromPage(member) {
+  async function trashMemberFromPage(member, triggerButton) {
     if (!window.confirm(`Move ${member.memberId} to Trash? Attendance history will be retained.`)) return;
-    try { const result = await apiCall('moveMemberToTrash', member.memberId); showToast(result.message, 'success'); await loadMembersPage(); }
-    catch (error) { showToast(error.message || 'Unable to move member.', 'error'); }
+    const action = async () => {
+      try {
+        const result = await apiCall('moveMemberToTrash', member.memberId);
+        showToast(result.message, 'success');
+        await loadMembersPage();
+      } catch (error) {
+        showToast(error.message || 'Unable to move member.', 'error');
+      }
+    };
+    if (triggerButton && window.runButtonAction) {
+      await window.runButtonAction(triggerButton, action, 'Deleting...');
+    } else {
+      await action();
+    }
   }
 
   function renderDirectoryMemberDetails(member) {
@@ -232,8 +256,8 @@
     const actions = document.createElement('div'); actions.className = 'dialog-actions';
     actions.append(
       directoryDetailAction('Edit', 'edit', () => openMemberEditor(member)),
-      directoryDetailAction('Archive', 'inventory_2', () => archiveMemberFromPage(member)),
-      directoryDetailAction('Delete', 'delete', () => trashMemberFromPage(member))
+      directoryDetailAction('Archive', 'inventory_2', (e) => archiveMemberFromPage(member, e.currentTarget)),
+      directoryDetailAction('Delete', 'delete', (e) => trashMemberFromPage(member, e.currentTarget))
     );
     cell.append(grid, actions); row.appendChild(cell); return row;
   }

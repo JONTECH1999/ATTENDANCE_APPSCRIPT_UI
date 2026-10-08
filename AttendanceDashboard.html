@@ -11,7 +11,108 @@
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
   <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,400,0,0" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.8/dist/chart.umd.min.js"></script>
+  <script>
+    (function() {
+      try {
+        var scale = parseFloat(localStorage.getItem('attendance-system-font-scale') || '1.15');
+        var minFont = localStorage.getItem('attendance-system-min-font') !== 'false';
+        var contrast = localStorage.getItem('attendance-system-contrast') === 'true';
+        var spacing = localStorage.getItem('attendance-system-spacing') !== 'false';
+        if (!isNaN(scale) && scale > 0) {
+          document.documentElement.style.zoom = scale;
+          document.documentElement.setAttribute('data-font-scale', Math.round(scale * 100));
+        }
+        if (minFont) document.documentElement.setAttribute('data-min-font', 'boost');
+        if (contrast) document.documentElement.setAttribute('data-high-contrast', 'true');
+        if (spacing) document.documentElement.setAttribute('data-spacing', 'comfortable');
+      } catch (e) {}
+    })();
+
+    window.applySystemDisplaySettings = function(opts) {
+      try {
+        var scale = opts && opts.scale ? opts.scale : parseFloat(localStorage.getItem('attendance-system-font-scale') || '1.15');
+        var minFont = opts && typeof opts.minFont === 'boolean' ? opts.minFont : (localStorage.getItem('attendance-system-min-font') !== 'false');
+        var contrast = opts && typeof opts.contrast === 'boolean' ? opts.contrast : (localStorage.getItem('attendance-system-contrast') === 'true');
+        var spacing = opts && typeof opts.spacing === 'boolean' ? opts.spacing : (localStorage.getItem('attendance-system-spacing') !== 'false');
+
+        if (!isNaN(scale) && scale > 0) {
+          document.documentElement.style.zoom = scale;
+          document.documentElement.setAttribute('data-font-scale', Math.round(scale * 100));
+        }
+        if (minFont) {
+          document.documentElement.setAttribute('data-min-font', 'boost');
+        } else {
+          document.documentElement.removeAttribute('data-min-font');
+        }
+        if (contrast) {
+          document.documentElement.setAttribute('data-high-contrast', 'true');
+        } else {
+          document.documentElement.removeAttribute('data-high-contrast');
+        }
+        if (spacing) {
+          document.documentElement.setAttribute('data-spacing', 'comfortable');
+        } else {
+          document.documentElement.removeAttribute('data-spacing');
+        }
+        if (window.state && window.state.data && typeof window.renderCharts === 'function') {
+          try { window.renderCharts(window.state.data); } catch (err) {}
+        }
+      } catch (e) {
+        console.warn('applySystemDisplaySettings error:', e);
+      }
+    };
+  </script>
   <style>
+    /* System font size and visibility boost rules */
+    html[data-min-font="boost"] .detail-field span,
+    html[data-min-font="boost"] .pagination-copy,
+    html[data-min-font="boost"] .page-button,
+    html[data-min-font="boost"] .nav-label,
+    html[data-min-font="boost"] .profile-copy span,
+    html[data-min-font="boost"] .today-attendance-card-label,
+    html[data-min-font="boost"] .table th,
+    html[data-min-font="boost"] .member-avatar,
+    html[data-min-font="boost"] .member-meta span,
+    html[data-min-font="boost"] .eyebrow,
+    html[data-min-font="boost"] .stat-mini .label,
+    html[data-min-font="boost"] .stat-mini .percent,
+    html[data-min-font="boost"] .attendance-badge,
+    html[data-min-font="boost"] .report-table th,
+    html[data-min-font="boost"] .statistics-report-table thead th,
+    html[data-min-font="boost"] .badge-inline,
+    html[data-min-font="boost"] .mini-badge,
+    html[data-min-font="boost"] .tab-pill,
+    html[data-min-font="boost"] .signoff-card span,
+    html[data-min-font="boost"] .signoff-box span,
+    html[data-min-font="boost"] .official-signoff-box span,
+    html[data-min-font="boost"] .attendee-meta-id,
+    html[data-min-font="boost"] .attendee-meta-category,
+    html[data-min-font="boost"] .attendee-meta-status,
+    html[data-min-font="boost"] .attendee-meta-contact,
+    html[data-min-font="boost"] .attendee-meta-committee,
+    html[data-min-font="boost"] .attendee-rate {
+      font-size: 11.5px !important;
+      font-weight: 600 !important;
+    }
+
+    html[data-high-contrast="true"] {
+      --muted: #2d3748 !important;
+      --line: #a0aec0 !important;
+      --ink: #000000 !important;
+      font-weight: 500;
+    }
+    html[data-high-contrast="true"] body.dark-mode {
+      --muted: #e2e8f0 !important;
+      --line: #718096 !important;
+      --ink: #ffffff !important;
+      font-weight: 500;
+    }
+
+    html[data-spacing="comfortable"] .table td { padding: 12px 14px; }
+    html[data-spacing="comfortable"] .table th { padding: 13px 14px; }
+    html[data-spacing="comfortable"] .stat-card { padding: 18px 20px; }
+    html[data-spacing="comfortable"] .attendee-row { padding: 12px 16px; }
+
     :root {
       color-scheme: light;
       --primary: #2563eb;
@@ -160,8 +261,8 @@
     .loading-cover.show { display: grid; }
     .loader-box { display: flex; align-items: center; gap: 11px; padding: 15px 18px; background: var(--surface); border: 1px solid var(--line); border-radius: 7px; box-shadow: var(--shadow); color: var(--muted); font-size: 11px; }
     .spinner { width: 19px; height: 19px; border: 2px solid var(--line); border-top-color: var(--primary); border-radius: 50%; animation: spin .7s linear infinite; }
-    .button-loading-spinner { width: 14px; height: 14px; flex: 0 0 auto; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: spin .7s linear infinite; }
-    button[aria-busy="true"] { cursor: wait; }
+    .button-loading-spinner { display: inline-block; width: 14px; height: 14px; flex: 0 0 auto; vertical-align: middle; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: spin .7s linear infinite; }
+    button[aria-busy="true"] { cursor: wait !important; pointer-events: none !important; opacity: 0.85; }
     @keyframes spin { to { transform: rotate(360deg); } }
     .toast-stack { position: fixed; top: 82px; right: 22px; z-index: 80; display: grid; gap: 8px; }
     .toast { display: flex; align-items: center; gap: 8px; max-width: min(380px, calc(100vw - 28px)); padding: 10px 13px; color: white; background: var(--dark); border-radius: 5px; box-shadow: 0 8px 24px #0002; font-size: 11px; animation: toast-in .18s ease-out; }
@@ -231,7 +332,10 @@
     .chat-header { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; color: white; background: var(--primary); }
     .chat-header strong { font-size: 12px; }
     .chat-header span { display: block; color: #dce7ff; font-size: 9px; }
-    .chat-close { display: grid; place-items: center; width: 29px; height: 29px; color: white; background: transparent; border: 0; }
+    .chat-close { display: grid; flex: 0 0 42px; place-items: center; width: 42px; height: 42px; color: white; background: rgba(255,255,255,.16); border: 1px solid rgba(255,255,255,.35); border-radius: 8px; cursor: pointer; }
+    .chat-close:hover { background: rgba(255,255,255,.28); }
+    .chat-close:focus-visible { outline: 2px solid white; outline-offset: 2px; }
+    .chat-close .material-symbols-rounded { color: white; font-size: 26px; line-height: 1; }
     .chat-messages { display: flex; flex: 1; flex-direction: column; gap: 8px; overflow-y: auto; padding: 12px; background: var(--canvas); }
     .chat-message { max-width: 89%; padding: 8px 10px; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 8px 8px 8px 2px; font-size: 11px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
     .chat-message.user { align-self: flex-end; color: white; background: var(--primary); border-color: var(--primary); border-radius: 8px 8px 2px 8px; }
@@ -582,6 +686,7 @@
         <?!= include('Demographics'); ?>
         <?!= include('Statistics'); ?>
         <?!= include('Reports'); ?>
+        <?!= include('Settings'); ?>
         <style id="monochrome-responsive-theme">
           :root {
             color-scheme: light;
@@ -1291,7 +1396,11 @@
       button.setAttribute('aria-busy', 'true');
       if (measuredWidth) button.style.width = `${measuredWidth}px`;
       const spinner = document.createElement('span'); spinner.className = 'button-loading-spinner'; spinner.setAttribute('aria-hidden', 'true');
-      if (button.classList.contains('row-icon-button')) {
+      const isIconOnly = button.classList.contains('row-icon-button') ||
+                         button.classList.contains('icon-button') ||
+                         button.classList.contains('page-button') ||
+                         (!button.textContent.trim() && Boolean(button.querySelector('.material-symbols-rounded')));
+      if (isIconOnly) {
         button.replaceChildren(spinner);
         button.title = loadingLabel || 'Working...';
         button.setAttribute('aria-label', loadingLabel || 'Working...');
@@ -1524,7 +1633,7 @@
         const row = document.createElement('div'); row.className = 'gathering-attendee-row';
         const name = document.createElement('strong'); name.className = 'gathering-attendee-name'; name.textContent = attendee.name;
         const meta = document.createElement('span'); meta.className = 'gathering-attendee-meta';
-        meta.textContent = [attendee.memberId, attendee.schedule].filter(Boolean).join(' · ');
+        meta.textContent = [attendee.memberId, attendee.schedule ? formatScheduleName(attendee.schedule) : ''].filter(Boolean).join(' · ');
         const badge = document.createElement('span'); badge.className = `badge ${attendee.status === 'Present' ? 'badge-green' : attendee.status === 'Late' ? 'badge-amber' : attendee.status === 'Absent' ? 'badge-red' : 'badge-blue'}`;
         badge.textContent = attendee.status;
         row.append(name, meta, badge); list.appendChild(row);
@@ -1785,6 +1894,7 @@
         Demographics: 'demographics-page',
         Statistics: 'statistics-page-module',
         Reports: 'reports-page',
+        Settings: 'settings-page',
       };
       const isStatistics = page === 'Statistics';
       const hasModule = Boolean(pageViews[page]);
@@ -1793,11 +1903,16 @@
       document.getElementById('demographics-page').hidden = page !== 'Demographics';
       document.getElementById('statistics-page-module').hidden = page !== 'Statistics';
       document.getElementById('reports-page').hidden = page !== 'Reports';
-      Object.values(pageViews).forEach(id => { document.getElementById(id).hidden = pageViews[page] !== id; });
+      const settingsView = document.getElementById('settings-page');
+      if (settingsView) settingsView.hidden = page !== 'Settings';
+      Object.values(pageViews).forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.hidden = pageViews[page] !== id;
+      });
       const placeholder = document.getElementById('placeholder-page');
-      placeholder.classList.toggle('show', !hasModule && !showStatisticsPlaceholder && page !== 'Demographics' && page !== 'Statistics' && page !== 'Reports');
+      placeholder.classList.toggle('show', !hasModule && !showStatisticsPlaceholder && page !== 'Demographics' && page !== 'Statistics' && page !== 'Reports' && page !== 'Settings');
       document.getElementById('page-title').textContent = page === 'Dashboard' ? 'Members Statistics' : page;
-      document.getElementById('header-subtitle').textContent = page === 'Dashboard' ? 'Membership and attendance overview' : page === 'Demographics' ? 'Official demographic report' : page === 'Statistics' ? 'Membership statistics breakdown' : page === 'Reports' ? 'Administrative reporting overview' : page === 'Special Events' ? 'Create programs and schedule one-time gatherings' : page === 'Event History' ? 'Past event programs and saved attendance' : hasModule ? 'Membership office workspace' : `${page} module · planned workspace`;
+      document.getElementById('header-subtitle').textContent = page === 'Dashboard' ? 'Membership and attendance overview' : page === 'Demographics' ? 'Official demographic report' : page === 'Statistics' ? 'Membership statistics breakdown' : page === 'Reports' ? 'Administrative reporting overview' : page === 'Settings' ? 'System font size, display scaling, and visibility preferences' : page === 'Special Events' ? 'Create programs and schedule one-time gatherings' : page === 'Event History' ? 'Past event programs and saved attendance' : hasModule ? 'Membership office workspace' : `${page} module · planned workspace`;
       document.getElementById('top-actions').style.display = page === 'Dashboard' ? '' : 'none';
       document.getElementById('clark-launcher').classList.toggle('compact', page === 'Members');
       document.getElementById('placeholder-title').textContent = page === 'Dashboard' ? 'Dashboard is empty for now' : page;
@@ -1815,6 +1930,7 @@
       if (page === 'Demographics' && typeof loadDemographicsPage === 'function') loadModuleOnce(page, loadDemographicsPage);
       if (page === 'Statistics' && typeof loadStatisticsModule === 'function') loadModuleOnce(page, loadStatisticsModule);
       if (page === 'Reports' && typeof loadReportsModule === 'function') loadModuleOnce(page, loadReportsModule);
+      if (page === 'Settings' && typeof loadSettingsModule === 'function') loadModuleOnce(page, loadSettingsModule);
     }
 
     function openMobileNav() { document.getElementById('sidebar').classList.add('open'); document.getElementById('mobile-overlay').classList.add('show'); }
@@ -1936,7 +2052,7 @@
         state.sortDirection = state.sortKey === key ? state.sortDirection * -1 : 1;
         state.sortKey = key; renderMembers();
       }));
-      document.getElementById('export-button').addEventListener('click', exportCsv);
+      document.getElementById('export-button').addEventListener('click', event => window.runButtonAction(event.currentTarget, () => Promise.resolve().then(exportCsv), 'Exporting...'));
       document.getElementById('print-button').addEventListener('click', () => { logAction('PRINT_STATISTICS'); window.print(); });
       document.getElementById('today-present-card').addEventListener('click', () => showGatheringAttendees('Present'));
       document.getElementById('today-unmarked-card').addEventListener('click', () => showGatheringAttendees('Unmarked'));
@@ -1960,6 +2076,7 @@
     initializeDateRange();
     bindEvents();
     updateTheme();
+    if (typeof window.applySystemDisplaySettings === 'function') window.applySystemDisplaySettings();
     refreshLiveGatheringEvents();
     renderLiveContext();
     window.setInterval(renderLiveContext, 1000);
@@ -1992,25 +2109,35 @@
         function formatScheduleTime(value) {
           const parsed = parseGatheringTime(value);
           if (!parsed) return String(value || '').trim();
-          const date = new Date(2000, 0, 1, parsed.hour, parsed.minute);
-          return new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }).format(date);
+          const period = parsed.hour < 12 ? 'AM' : 'PM';
+          const displayHour = parsed.hour % 12 || 12;
+          return `${displayHour}:${String(parsed.minute).padStart(2, '0')} ${period}`;
         }
 
         function formatScheduleName(value) {
-          return String(value || '').trim().replace(/\b(\d{1,2}:\d{2})\s*(AM|PM)?\b/gi, (match, time, suffix) =>
-            formatScheduleTime(suffix ? `${time} ${suffix}` : time));
+          return String(value || '').trim().replace(/\b(\d{1,2})(?::(\d{2}))?\s*(AM|PM)\b|\b(\d{1,2}:\d{2})\b/gi, match =>
+            formatScheduleTime(match) || match);
         }
 
         function formatScheduleOption(schedule) {
           const day = String(schedule.dayOfWeek || '').trim();
-          const name = String(schedule.name || '').trim();
-          const seededName = name.match(/^([A-Za-z]+)\s+\d{1,2}:\d{2}$/);
-          const nameLabel = day && seededName && seededName[1].toLowerCase() === day.toLowerCase()
-            ? ''
-            : formatScheduleName(name);
-          return [nameLabel, day || schedule.date, schedule.time ? formatScheduleTime(schedule.time) : '']
-            .filter(Boolean)
-            .join(' · ') || 'Schedule';
+          const name = formatScheduleName(schedule.name);
+          const time = schedule.time ? formatScheduleTime(schedule.time) : '';
+          const date = schedule.date || '';
+
+          if (name && name !== 'Schedule') {
+            if (time && name.includes(time) && day && name.toLowerCase().includes(day.toLowerCase())) {
+              return name;
+            }
+            if (time && name.includes(time)) {
+              return [day || date, name].filter(Boolean).filter((v, i, a) => a.indexOf(v) === i).join(' · ');
+            }
+            if (day && name.toLowerCase().includes(day.toLowerCase())) {
+              return [name, time].filter(Boolean).join(' · ');
+            }
+            return [name, day || date, time].filter(Boolean).filter((v, i, a) => a.indexOf(v) === i).join(' · ');
+          }
+          return [day || date, time].filter(Boolean).join(' · ') || 'Schedule';
         }
 
         function renderLiveContext() {

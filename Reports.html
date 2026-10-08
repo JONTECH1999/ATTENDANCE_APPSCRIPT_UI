@@ -122,10 +122,10 @@
         <p>MCGI youth official membership statistics, demographic breakdown, and per-gathering attendance.</p>
       </div>
       <div class="reports-actions">
-        <button class="reports-btn primary" type="button">Push to Google Sheets</button>
-        <button class="reports-btn" type="button">Export Official CSV</button>
-        <button class="reports-btn" type="button">Save Snapshot</button>
-        <button class="reports-btn" type="button">Print</button>
+        <button id="reports-push-sheets" class="reports-btn primary" type="button">Push to Google Sheets</button>
+        <button id="reports-export-csv" class="reports-btn" type="button">Export Official CSV</button>
+        <button id="reports-save-snapshot" class="reports-btn" type="button">Save Snapshot</button>
+        <button id="reports-print" class="reports-btn" type="button">Print</button>
       </div>
     </div>
 
@@ -438,9 +438,11 @@
           const rate = totalLogs > 0 ? Math.round((present / totalLogs) * 100) : 0;
           const badgeClass = rate >= 75 ? 'good' : rate >= 50 ? 'warn' : 'danger';
           const tr = document.createElement('tr');
+          const dateLabel = evt.dateRange || evt.eventDate;
+          const scheduleLabel = evt.scheduleName ? ` (${escapeHtml(evt.scheduleName)})` : '';
           tr.innerHTML = `<td>${escapeHtml(evt.eventName)}</td>
             <td>${escapeHtml(evt.category || 'Gathering')}</td>
-            <td>${evt.eventDate}</td>
+            <td>${dateLabel}${scheduleLabel}</td>
             <td>${evt.present || 0}</td>
             <td>${evt.absent || 0}</td>
             <td>${evt.late || 0}</td>
@@ -452,4 +454,72 @@
       }
     }
   }
+
+  function exportReportsCsv() {
+    const table = document.querySelector('#reports-page .report-table');
+    if (!table) return;
+    const rows = [];
+    table.querySelectorAll('tr').forEach(tr => {
+      const cells = [];
+      tr.querySelectorAll('th, td').forEach(cell => {
+        cells.push(`"${String(cell.textContent || '').trim().replace(/"/g, '""')}"`);
+      });
+      if (cells.length) rows.push(cells.join(','));
+    });
+    const blob = new Blob(['\ufeff' + rows.join('\r\n')], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `reports-summary-${dateInputValue(new Date())}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+    showToast('Official report CSV exported.', 'success');
+  }
+
+  function bindReportsActions() {
+    const pushBtn = document.getElementById('reports-push-sheets');
+    if (pushBtn) {
+      pushBtn.addEventListener('click', event => {
+        window.runButtonAction(event.currentTarget, async () => {
+          try {
+            const result = await apiCall('syncMemberAttendanceRollups');
+            showToast(result && result.message ? result.message : 'Successfully synced attendance metrics with Google Sheets.', 'success');
+          } catch (err) {
+            showToast(err.message || 'Error updating spreadsheet.', 'error');
+          }
+        }, 'Pushing...');
+      });
+    }
+
+    const exportBtn = document.getElementById('reports-export-csv');
+    if (exportBtn) {
+      exportBtn.addEventListener('click', event => {
+        window.runButtonAction(event.currentTarget, () => Promise.resolve().then(exportReportsCsv), 'Exporting...');
+      });
+    }
+
+    const snapBtn = document.getElementById('reports-save-snapshot');
+    if (snapBtn) {
+      snapBtn.addEventListener('click', event => {
+        window.runButtonAction(event.currentTarget, async () => {
+          try {
+            await apiCall('logAction', 'SAVE_REPORT_SNAPSHOT', { timestamp: new Date().toISOString() });
+            showToast('Official report snapshot logged and archived.', 'success');
+          } catch (err) {
+            showToast(err.message || 'Error saving snapshot.', 'error');
+          }
+        }, 'Saving...');
+      });
+    }
+
+    const printBtn = document.getElementById('reports-print');
+    if (printBtn) {
+      printBtn.addEventListener('click', () => {
+        logAction('PRINT_REPORTS');
+        window.print();
+      });
+    }
+  }
+
+  bindReportsActions();
 </script>

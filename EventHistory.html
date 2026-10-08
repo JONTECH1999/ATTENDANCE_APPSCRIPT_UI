@@ -1,9 +1,82 @@
+<style>
+  .gathering-batch-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+    gap: 8px;
+    margin: 8px 0 12px;
+  }
+  .gathering-batch-card {
+    background: var(--canvas);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    padding: 10px 12px;
+    display: grid;
+    gap: 4px;
+  }
+  .gathering-batch-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 6px;
+    border-bottom: 1px solid var(--line);
+    padding-bottom: 6px;
+    margin-bottom: 2px;
+  }
+  .gathering-batch-card-header strong {
+    font-size: 11px;
+    color: var(--ink);
+  }
+  .gathering-batch-count {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--primary);
+  }
+  .gathering-batch-meta {
+    margin: 0;
+    font-size: 10px;
+    color: var(--muted);
+    line-height: 1.4;
+  }
+  .gathering-filter-pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 10px 0 8px;
+  }
+  .gathering-filter-pill {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 4px 10px;
+    font-size: 10px;
+    color: var(--ink);
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+  .gathering-filter-pill:hover, .gathering-filter-pill.active {
+    background: var(--primary);
+    color: #fff;
+    border-color: var(--primary);
+  }
+  .batch-badge {
+    display: inline-block;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 9px;
+    font-weight: 600;
+    margin-right: 4px;
+    margin-bottom: 2px;
+    background: rgba(103, 80, 164, 0.12);
+    color: #6750a4;
+  }
+</style>
+
 <section id="event-history-page" class="module-view" hidden>
   <div class="module-titlebar">
     <div>
       <p class="eyebrow">Saved attendance records</p>
       <h2>Event History</h2>
-      <p class="module-caption">Read-only event details and attendance. Member profile fields show their current values.</p>
+      <p class="module-caption">Gathering attendance cycles and batch breakdowns. Member profile fields show their current values.</p>
     </div>
     <div style="display:flex;gap:8px;">
       <button id="event-history-trash-button" class="module-button" type="button"><span class="material-symbols-rounded">delete</span>Archive Trash <span id="event-history-trash-count" class="count-chip">0</span></button>
@@ -12,11 +85,11 @@
   </div>
   <div class="event-history-layout">
     <section class="module-panel event-history-list-panel">
-      <div class="event-history-list-heading"><h3>Past Events</h3><span id="event-history-count" class="filter-count"></span></div>
-      <div id="event-history-list" class="event-history-list"><div class="module-empty">Loading event history...</div></div>
+      <div class="event-history-list-heading"><h3>Past Gatherings</h3><span id="event-history-count" class="filter-count"></span></div>
+      <div id="event-history-list" class="event-history-list"><div class="module-empty">Loading gathering history...</div></div>
     </section>
     <section id="event-history-detail" class="module-panel event-history-detail">
-      <div class="module-empty">Choose a past event to view its program and attendees.</div>
+      <div class="module-empty">Choose a past gathering to view its batches, program, and attendees.</div>
     </section>
   </div>
 </section>
@@ -61,24 +134,24 @@
       const requested = eventHistoryState.pendingSelection;
       eventHistoryState.pendingSelection = null;
       const requestedItem = requested && eventHistoryState.occurrences.find(item =>
-        item.eventId === requested.eventId && String(item.scheduleId) === String(requested.scheduleId) && item.eventDate === requested.eventDate);
+        item.key === requested.key || (item.eventId === requested.eventId && item.startDate <= requested.eventDate && item.endDate >= requested.eventDate));
       const selected = requestedItem || eventHistoryState.occurrences.find(item => item.key === eventHistoryState.selectedKey) || eventHistoryState.occurrences[0];
       if (selected) await selectEventHistory(selected.key);
       else renderEmptyEventHistory();
       state.loadedPages['Event History'] = true;
     } catch (error) {
-      showToast(error.message || 'Unable to load event history.', 'error');
+      showToast(error.message || 'Unable to load gathering history.', 'error');
     }
   }
 
   function renderEventHistoryList() {
     const list = document.getElementById('event-history-list');
     list.replaceChildren();
-    document.getElementById('event-history-count').textContent = `${formatNumber(eventHistoryState.occurrences.length)} record(s)`;
+    document.getElementById('event-history-count').textContent = `${formatNumber(eventHistoryState.occurrences.length)} gathering(s)`;
     if (!eventHistoryState.occurrences.length) {
       const empty = document.createElement('div');
       empty.className = 'module-empty';
-      empty.textContent = 'No past events have attendance records yet.';
+      empty.textContent = 'No past gatherings have attendance records yet.';
       list.appendChild(empty);
       return;
     }
@@ -95,26 +168,30 @@
       button.style.flex = '1';
       button.style.borderBottom = '0';
       button.setAttribute('aria-pressed', String(item.key === eventHistoryState.selectedKey));
+
       const title = document.createElement('strong');
       title.textContent = item.eventName;
+
       const subtitle = document.createElement('span');
-      subtitle.textContent = `${item.eventDate} · ${formatScheduleName(item.scheduleName)}${item.time ? ` · ${formatScheduleTime(item.time)}` : ''}`;
+      subtitle.textContent = `${item.dateRange || item.eventDate} · ${formatScheduleName(item.scheduleName)}`;
+
       const count = document.createElement('small');
-      count.textContent = `${formatNumber(item.attendanceCount)} attendance record(s)`;
+      count.textContent = `${formatNumber(item.attendanceCount)} unique attendee(s)${item.totalMarks && item.totalMarks !== item.attendanceCount ? ` · ${item.totalMarks} marks` : ''}`;
+
       button.append(title, subtitle, count);
       button.addEventListener('click', event => window.runButtonAction(event.currentTarget, () => selectEventHistory(item.key), 'Loading...'));
 
       const delBtn = document.createElement('button');
       delBtn.type = 'button';
       delBtn.className = 'icon-button';
-      delBtn.title = 'Archive this past event attendance (retained 30 days)';
+      delBtn.title = 'Archive this gathering attendance (retained 30 days)';
       delBtn.style.alignSelf = 'center';
       delBtn.style.marginRight = '8px';
       delBtn.style.color = 'var(--muted)';
       delBtn.innerHTML = '<span class="material-symbols-rounded">delete</span>';
       delBtn.addEventListener('click', (e) => {
         e.stopPropagation();
-        archivePastEventAttendance(item);
+        archivePastEventAttendance(item, e.currentTarget);
       });
 
       rowWrap.append(button, delBtn);
@@ -131,16 +208,16 @@
     panel.replaceChildren();
     const loading = document.createElement('div');
     loading.className = 'module-empty';
-    loading.textContent = 'Loading event details...';
+    loading.textContent = 'Loading gathering details...';
     panel.appendChild(loading);
     try {
-      const details = await apiCall('getEventHistoryDetails', item.eventId, item.scheduleId, item.eventDate);
+      const details = await apiCall('getEventHistoryDetails', item.key, '', item.eventDate);
       renderEventHistoryDetails(details);
     } catch (error) {
       panel.replaceChildren();
       const message = document.createElement('div');
       message.className = 'module-empty';
-      message.textContent = error.message || 'Unable to load this event.';
+      message.textContent = error.message || 'Unable to load this gathering.';
       panel.appendChild(message);
     }
   }
@@ -149,6 +226,8 @@
     const panel = document.getElementById('event-history-detail');
     panel.replaceChildren();
     const event = details.event;
+    const batches = details.batches || event.batches || [];
+    const allAttendees = details.attendees || [];
 
     const heading = document.createElement('header');
     heading.className = 'event-history-detail-heading';
@@ -161,21 +240,28 @@
     const title = document.createElement('h3');
     title.textContent = event.eventName;
     const meta = document.createElement('p');
-    meta.textContent = [event.category, event.eventDate, formatScheduleName(event.scheduleName), event.time ? formatScheduleTime(event.time) : '', event.location].filter(Boolean).join(' · ');
+    meta.textContent = [event.category, event.dateRange || event.eventDate, event.scheduleName ? formatScheduleName(event.scheduleName) : '', event.location].filter(Boolean).join(' · ');
     titleGroup.append(title, meta);
 
     const archiveBtn = document.createElement('button');
     archiveBtn.type = 'button';
     archiveBtn.className = 'module-button danger-outline';
-    archiveBtn.innerHTML = '<span class="material-symbols-rounded">delete</span>Archive This Event Attendance';
-    archiveBtn.title = 'Move attendance records to Archive Trash (30-day retention)';
-    archiveBtn.addEventListener('click', () => archivePastEventAttendance(event));
+    archiveBtn.innerHTML = '<span class="material-symbols-rounded">delete</span>Archive This Gathering Attendance';
+    archiveBtn.title = 'Move attendance records for this gathering to Archive Trash (30-day retention)';
+    archiveBtn.addEventListener('click', (e) => archivePastEventAttendance(event, e.currentTarget));
 
     heading.append(titleGroup, archiveBtn);
 
     const summary = document.createElement('div');
     summary.className = 'event-history-summary';
-    [['Present', event.present], ['Absent', event.absent], ['Late', event.late], ['Excused', event.excused], ['Total records', event.attendanceCount]].forEach(([label, value]) => {
+    [
+      ['Unique Attendees', event.attendanceCount],
+      ['Present', event.present],
+      ['Late', event.late],
+      ['Absent', event.absent],
+      ['Total Marks', event.totalMarks || event.attendanceCount],
+      ['Batches', batches.length]
+    ].forEach(([label, value]) => {
       const metric = document.createElement('div');
       metric.className = 'event-history-metric';
       const metricLabel = document.createElement('span');
@@ -185,84 +271,199 @@
       metric.append(metricLabel, metricValue);
       summary.appendChild(metric);
     });
-    const assignments = document.createElement('div');
-    assignments.className = 'event-history-assignments';
-    if (event.mproIncharge) assignments.appendChild(historyDetailField('MPRO Incharge', event.mproIncharge));
-    if (event.officersAssigned) assignments.appendChild(historyDetailField('Officers Assigned', event.officersAssigned));
+
+    // Schedule Batches Breakdown Section
+    const batchesTitle = document.createElement('h4');
+    batchesTitle.textContent = `Schedule Batches Breakdown (${batches.length})`;
+    const batchGrid = document.createElement('div');
+    batchGrid.className = 'gathering-batch-grid';
+
+    batches.forEach((batch, bIdx) => {
+      const card = document.createElement('div');
+      card.className = 'gathering-batch-card';
+
+      const cardHead = document.createElement('div');
+      cardHead.className = 'gathering-batch-card-header';
+      const bTitle = document.createElement('strong');
+      bTitle.textContent = formatScheduleName(batch.name) || (batch.day && batch.time ? `${batch.day} ${formatScheduleTime(batch.time)}` : `Batch ${bIdx + 1}`);
+      const bCount = document.createElement('span');
+      bCount.className = 'gathering-batch-count';
+      bCount.textContent = `${formatNumber(batch.attendanceCount || 0)} attendees`;
+      cardHead.append(bTitle, bCount);
+
+      const mpro = document.createElement('p');
+      mpro.className = 'gathering-batch-meta';
+      mpro.innerHTML = `<strong>MPRO:</strong> ${escapeHtml(batch.mproIncharge || 'Not assigned')}`;
+
+      const officers = document.createElement('p');
+      officers.className = 'gathering-batch-meta';
+      officers.innerHTML = `<strong>Officers:</strong> ${escapeHtml(batch.officersAssigned || 'Not assigned')}`;
+
+      card.append(cardHead, mpro, officers);
+      batchGrid.appendChild(card);
+    });
+
     const description = document.createElement('p');
     description.className = 'event-history-description';
     description.textContent = event.description || '';
+
     const programTitle = document.createElement('h4');
     programTitle.textContent = 'Program';
     const program = document.createElement('pre');
     program.className = 'special-event-program';
-    program.textContent = event.program || 'No program was recorded for this event.';
+    program.textContent = event.program || 'No program was recorded for this gathering.';
+
+    // Attendee Table and Interactive Batch Filter
+    const attendeeHeadingGroup = document.createElement('div');
+    attendeeHeadingGroup.style.display = 'flex';
+    attendeeHeadingGroup.style.justifyContent = 'space-between';
+    attendeeHeadingGroup.style.alignItems = 'center';
+    attendeeHeadingGroup.style.flexWrap = 'wrap';
+    attendeeHeadingGroup.style.gap = '8px';
+    attendeeHeadingGroup.style.marginTop = '14px';
+
     const attendeeTitle = document.createElement('h4');
-    attendeeTitle.textContent = `Attendance Records (${formatNumber(details.attendees.length)})`;
+    attendeeTitle.style.margin = '0';
+    attendeeTitle.textContent = `Attendees Roster (${formatNumber(allAttendees.length)} unique members)`;
+    attendeeHeadingGroup.appendChild(attendeeTitle);
+
+    // Interactive Filter Pills
+    const pillBar = document.createElement('div');
+    pillBar.className = 'gathering-filter-pills';
+
+    let currentBatchFilter = 'ALL';
+
+    const renderAttendeeRows = (filter) => {
+      body.replaceChildren();
+      const filterNorm = formatScheduleName(filter).toLowerCase();
+      const filtered = filter === 'ALL'
+        ? allAttendees
+        : allAttendees.filter(a => (a.attendedBatches || []).some(b => {
+            const bNorm = formatScheduleName(b).toLowerCase();
+            return bNorm.includes(filterNorm) || filterNorm.includes(bNorm);
+          }));
+
+      attendeeTitle.textContent = `Attendees Roster (${formatNumber(filtered.length)}${filter !== 'ALL' ? ` in ${formatScheduleName(filter)}` : ' unique members'})`;
+
+      if (!filtered.length) {
+        const row = body.insertRow();
+        const cell = row.insertCell();
+        cell.colSpan = 10;
+        cell.className = 'module-empty';
+        cell.textContent = filter === 'ALL'
+          ? 'No attendance records were saved for this gathering.'
+          : `No members attended in batch "${formatScheduleName(filter)}".`;
+        return;
+      }
+
+      filtered.forEach(attendee => {
+        const row = body.insertRow();
+        const statusTone = /present/i.test(attendee.status) ? 'green' : /late/i.test(attendee.status) ? 'amber' : /absent/i.test(attendee.status) ? 'red' : 'blue';
+        const mStatus = attendee.membershipStatus || (attendee.member && attendee.member.membershipStatus) || '—';
+        const mCategory = attendee.category || (attendee.member && attendee.member.category) || '—';
+        const sStatus = attendee.studentStatus || (attendee.member && attendee.member.studentStatus) || '—';
+        const eStatus = attendee.employmentStatus || (attendee.member && attendee.member.employmentStatus) || '—';
+        const comms = attendee.committees || (attendee.member && attendee.member.committees) || '—';
+        const contact = attendee.contactNumber || (attendee.member && attendee.member.contactNumber) || '—';
+
+        const cId = row.insertCell(); cId.className = 'id-cell'; cId.textContent = attendee.memberId;
+        const cName = row.insertCell(); cName.innerHTML = `<strong>${escapeHtml(attendee.name)}</strong>`;
+
+        const cBatches = row.insertCell();
+        if (attendee.attendedBatches && attendee.attendedBatches.length) {
+          attendee.attendedBatches.forEach(bName => {
+            const span = document.createElement('span');
+            span.className = 'batch-badge';
+            span.textContent = formatScheduleName(bName);
+            cBatches.appendChild(span);
+          });
+        } else {
+          cBatches.textContent = formatScheduleName(attendee.batchNames) || '—';
+        }
+
+        const cStatus = row.insertCell(); cStatus.appendChild(makeBadge(attendee.status, statusTone));
+        const cCat = row.insertCell(); cCat.appendChild(makeBadge(mCategory, 'purple'));
+        const cMem = row.insertCell(); cMem.appendChild(makeBadge(mStatus, /active/i.test(mStatus) ? 'green' : 'amber'));
+        const cStudent = row.insertCell(); cStudent.textContent = sStatus;
+        const cEmp = row.insertCell(); cEmp.textContent = eStatus;
+        const cComms = row.insertCell(); cComms.textContent = comms;
+        const cContact = row.insertCell(); cContact.textContent = contact;
+      });
+    };
+
+    const allPill = document.createElement('button');
+    allPill.type = 'button';
+    allPill.className = 'gathering-filter-pill active';
+    allPill.textContent = `All Batches (${allAttendees.length})`;
+    allPill.onclick = () => {
+      pillBar.querySelectorAll('.gathering-filter-pill').forEach(p => p.classList.remove('active'));
+      allPill.classList.add('active');
+      renderAttendeeRows('ALL');
+    };
+    pillBar.appendChild(allPill);
+
+    batches.forEach(b => {
+      const bPill = document.createElement('button');
+      bPill.type = 'button';
+      bPill.className = 'gathering-filter-pill';
+      const bLabel = formatScheduleName(b.name);
+      bPill.textContent = `${bLabel} (${b.attendanceCount || 0})`;
+      bPill.onclick = () => {
+        pillBar.querySelectorAll('.gathering-filter-pill').forEach(p => p.classList.remove('active'));
+        bPill.classList.add('active');
+        renderAttendeeRows(b.name);
+      };
+      pillBar.appendChild(bPill);
+    });
+
     const tableWrap = document.createElement('div');
     tableWrap.className = 'module-table-scroll event-history-table-wrap';
     const table = document.createElement('table');
     table.className = 'module-table event-history-table';
     const head = table.createTHead().insertRow();
-    ['Member ID', 'Name', 'Contact', 'Category', 'Membership', 'Attendance Status', 'Student Status', 'Employment', 'Committees', 'Recorded By'].forEach(label => {
+    ['Member ID', 'Name', 'Attended Batch(es)', 'Status', 'Category', 'Membership', 'Student Status', 'Employment', 'Committees', 'Contact'].forEach(label => {
       const cell = document.createElement('th');
       cell.textContent = label;
       head.appendChild(cell);
     });
     const body = table.createTBody();
-    if (!details.attendees.length) {
-      const row = body.insertRow();
-      const cell = row.insertCell();
-      cell.colSpan = 10;
-      cell.className = 'module-empty';
-      cell.textContent = 'No attendance records were saved for this event.';
-    }
-    details.attendees.forEach(attendee => {
-      const row = body.insertRow();
-      const statusTone = /present/i.test(attendee.status) ? 'green' : /late/i.test(attendee.status) ? 'amber' : /absent/i.test(attendee.status) ? 'red' : 'blue';
-      const mStatus = attendee.membershipStatus || (attendee.member && attendee.member.membershipStatus) || '—';
-      const mCategory = attendee.category || (attendee.member && attendee.member.category) || '—';
-      const sStatus = attendee.studentStatus || (attendee.member && attendee.member.studentStatus) || '—';
-      const eStatus = attendee.employmentStatus || (attendee.member && attendee.member.employmentStatus) || '—';
-      const comms = attendee.committees || (attendee.member && attendee.member.committees) || '—';
-      const contact = attendee.contactNumber || (attendee.member && attendee.member.contactNumber) || '—';
-
-      const cId = row.insertCell(); cId.className = 'id-cell'; cId.textContent = attendee.memberId;
-      const cName = row.insertCell(); cName.innerHTML = `<strong>${escapeHtml(attendee.name)}</strong>`;
-      const cContact = row.insertCell(); cContact.textContent = contact;
-      const cCat = row.insertCell(); cCat.appendChild(makeBadge(mCategory, 'purple'));
-      const cMem = row.insertCell(); cMem.appendChild(makeBadge(mStatus, /active/i.test(mStatus) ? 'green' : 'amber'));
-      const cStatus = row.insertCell(); cStatus.appendChild(makeBadge(attendee.status, statusTone));
-      const cStudent = row.insertCell(); cStudent.textContent = sStatus;
-      const cEmp = row.insertCell(); cEmp.textContent = eStatus;
-      const cComms = row.insertCell(); cComms.textContent = comms;
-      const cRecorded = row.insertCell(); cRecorded.textContent = attendee.recordedBy ? `${attendee.recordedBy}` : '—';
-    });
     tableWrap.appendChild(table);
+
+    renderAttendeeRows('ALL');
+
     const footnote = document.createElement('p');
     footnote.className = 'module-help';
-    footnote.textContent = 'Attendance statuses are historical. Member category, membership, student, and committee values are current profile data synchronized with MEMBERS.';
-    panel.append(heading, summary, assignments, description, programTitle, program, attendeeTitle, tableWrap, footnote);
+    footnote.textContent = 'Each gathering cycle accumulates all attendee marks across its batches into one consolidated gathering record. Members are counted once per gathering cycle towards their attendance rate.';
+
+    panel.append(heading, summary, batchesTitle, batchGrid, description, programTitle, program, attendeeHeadingGroup, pillBar, tableWrap, footnote);
   }
 
-  async function archivePastEventAttendance(item) {
+  async function archivePastEventAttendance(item, triggerButton) {
     if (!item) return;
-    const eventName = item.eventName || item.name || 'Event';
-    const eventDate = item.eventDate || item.date || '';
+    const eventName = item.eventName || item.name || 'Gathering';
+    const dateLabel = item.dateRange || item.eventDate || item.startDate || '';
     const count = item.attendanceCount !== undefined ? item.attendanceCount : (item.present || 0) + (item.absent || 0) + (item.late || 0) + (item.excused || 0);
 
-    if (!window.confirm(`Move past event "${eventName}" on ${eventDate} (${formatNumber(count)} attendance record(s)) to Archive Trash?\n\nRecords will be retained for 30 days before permanent deletion. Member attendance statistics and percentages will be recalculated automatically.`)) {
+    if (!window.confirm(`Move gathering "${eventName}" (${dateLabel}) with ${formatNumber(count)} unique attendee(s) to Archive Trash?\n\nAll batches in this gathering cycle will be archived with 30-day retention. Member attendance statistics and percentages will be recalculated automatically.`)) {
       return;
     }
 
-    try {
-      const result = await apiCall('deleteEventHistoryOccurrence', item.eventId, item.scheduleId, eventDate);
-      showToast(result.message || 'Archived past event to 30-day trash.', 'success');
-      eventHistoryState.selectedKey = '';
-      await loadEventHistory();
-      await updateHistoryTrashCount();
-    } catch (err) {
-      showToast(err.message || 'Unable to archive event attendance.', 'error');
+    const performArchive = async () => {
+      try {
+        const result = await apiCall('deleteEventHistoryOccurrence', item.eventId, item.scheduleId, item.startDate || item.eventDate);
+        showToast(result.message || 'Archived past gathering to 30-day trash.', 'success');
+        eventHistoryState.selectedKey = '';
+        await loadEventHistory();
+        await updateHistoryTrashCount();
+      } catch (err) {
+        showToast(err.message || 'Unable to archive gathering attendance.', 'error');
+      }
+    };
+
+    if (triggerButton && window.runButtonAction) {
+      await window.runButtonAction(triggerButton, performArchive, 'Archiving...');
+    } else {
+      await performArchive();
     }
   }
 
@@ -271,9 +472,7 @@
       const trashList = await apiCall('getDeletedEventHistory');
       const badge = document.getElementById('event-history-trash-count');
       if (badge) badge.textContent = formatNumber(trashList.length);
-    } catch (e) {
-      // ignore
-    }
+    } catch (e) {}
   }
 
   async function openHistoryTrashModal() {
@@ -287,29 +486,31 @@
       if (badge) badge.textContent = formatNumber(trashList.length);
       tbody.replaceChildren();
       if (!trashList.length) {
-        tbody.innerHTML = '<tr><td colspan="6" class="module-empty">No past event records in trash.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="6" class="module-empty">No past gathering records in trash.</td></tr>';
         return;
       }
       trashList.forEach(item => {
         const tr = document.createElement('tr');
         const tdName = document.createElement('td'); tdName.innerHTML = `<strong>${escapeHtml(item.eventName)}</strong>`;
         const tdDate = document.createElement('td'); tdDate.textContent = item.eventDate;
-        const tdSched = document.createElement('td'); tdSched.textContent = item.scheduleName || '—';
-        const tdCount = document.createElement('td'); tdCount.textContent = `${formatNumber(item.recordCount)} records`;
+        const tdSched = document.createElement('td'); tdSched.textContent = formatScheduleName(item.scheduleName) || 'All Batches';
+        const tdCount = document.createElement('td'); tdCount.textContent = `${formatNumber(item.recordCount)} marks`;
         const tdDel = document.createElement('td'); tdDel.textContent = item.deletedAt ? item.deletedAt : 'Recently';
         const tdAct = document.createElement('td');
         const restoreBtn = document.createElement('button');
         restoreBtn.className = 'module-button success-outline';
         restoreBtn.innerHTML = '<span class="material-symbols-rounded">restore_from_trash</span>Restore';
-        restoreBtn.onclick = async () => {
-          try {
-            const res = await apiCall('restoreDeletedEventHistory', item.archiveId);
-            showToast(res.message, 'success');
-            await openHistoryTrashModal();
-            await loadEventHistory();
-          } catch (e) {
-            showToast(e.message || 'Unable to restore event attendance.', 'error');
-          }
+        restoreBtn.onclick = (e) => {
+          window.runButtonAction(e.currentTarget, async () => {
+            try {
+              const res = await apiCall('restoreDeletedEventHistory', item.archiveId);
+              showToast(res.message, 'success');
+              await openHistoryTrashModal();
+              await loadEventHistory();
+            } catch (err) {
+              showToast(err.message || 'Unable to restore gathering attendance.', 'error');
+            }
+          }, 'Restoring...');
         };
         tdAct.appendChild(restoreBtn);
         tr.append(tdName, tdDate, tdSched, tdCount, tdDel, tdAct);
@@ -320,23 +521,13 @@
     }
   }
 
-  function historyDetailField(label, value) {
-    const field = document.createElement('p');
-    const term = document.createElement('strong');
-    term.textContent = `${label}: `;
-    const detail = document.createElement('span');
-    detail.textContent = value;
-    field.append(term, detail);
-    return field;
-  }
-
   function renderEmptyEventHistory() {
     eventHistoryState.selectedKey = '';
     const panel = document.getElementById('event-history-detail');
     panel.replaceChildren();
     const empty = document.createElement('div');
     empty.className = 'module-empty';
-    empty.textContent = 'Choose a past event to view its program and attendees.';
+    empty.textContent = 'Choose a past gathering to view its batches, program, and attendees.';
     panel.appendChild(empty);
   }
 
@@ -346,5 +537,5 @@
   }
 
   document.getElementById('refresh-event-history').addEventListener('click', event => window.runButtonAction(event.currentTarget, loadEventHistory, 'Refreshing...'));
-  document.getElementById('event-history-trash-button').addEventListener('click', openHistoryTrashModal);
+  document.getElementById('event-history-trash-button').addEventListener('click', event => window.runButtonAction(event.currentTarget, openHistoryTrashModal, 'Opening...'));
 </script>
