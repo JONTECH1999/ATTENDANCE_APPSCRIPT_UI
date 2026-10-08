@@ -215,6 +215,9 @@
     .stat-icon .material-symbols-rounded { font-size: 16px; }
     .stat-value { margin-top: 9px; color: var(--ink); font: 800 25px "Manrope", sans-serif; font-variant-numeric: tabular-nums; }
     .stat-foot { display: flex; align-items: center; gap: 5px; margin-top: 4px; color: var(--muted); font-size: 9px; }
+    .active-members-stat-card .stat-top,
+    .active-members-stat-card .stat-value,
+    .active-members-stat-card .stat-foot { color: var(--primary); }
     .trend-positive { color: #09835d; font-weight: 700; }
     .trend-negative { color: var(--danger); font-weight: 700; }
     .chart-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 13px; margin-bottom: 14px; }
@@ -247,6 +250,20 @@
     .badge-red { color: #b42318; background: #feeceb; }
     .badge-amber { color: #9a5b00; background: #fff4da; }
     .badge-blue { color: #2451b7; background: #eaf0ff; }
+    .badge-muted { color: var(--muted); background: var(--canvas); border: 1px solid var(--line); }
+    /* Group divider row between status sections */
+    tr.member-group-divider td {
+      padding: 5px 12px 4px;
+      background: var(--canvas);
+      border-top: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 9px;
+      font-weight: 750;
+      letter-spacing: .07em;
+      text-transform: uppercase;
+    }
+    tr.member-group-divider:first-child td { border-top: none; }
     .detail-row td { padding: 0; background: var(--surface) !important; }
     .detail-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px 18px; padding: 15px 20px; background: var(--canvas); border-bottom: 1px solid var(--line); }
     .detail-field span { display: block; color: var(--muted); font-size: 9px; }
@@ -365,6 +382,8 @@
     body.dark-mode .badge-red { color: #fca5a5; background: #5a2525; }
     body.dark-mode .badge-amber { color: #fcd34d; background: #5a4016; }
     body.dark-mode .badge-blue { color: #b6c8ff; background: #263c64; }
+    body.dark-mode .badge-muted { color: #7a8599; background: #1e2738; border-color: #2e3a4e; }
+    body.dark-mode tr.member-group-divider td { background: #14202e; color: #5c6a80; border-color: #1e2a3a; }
     .module-view[hidden] { display: none !important; }
     .module-titlebar { display: flex; align-items: flex-end; justify-content: space-between; gap: 15px; margin: 0 0 15px; }
     .module-titlebar h2 { margin: 0; font: 800 20px "Manrope", sans-serif; }
@@ -637,8 +656,8 @@
             <div id="gathering-attendees-list" class="gathering-attendee-list"></div>
           </dialog>
           <section class="stats-cards" aria-label="Key statistics">
-            <article class="stat-card" style="--accent:var(--primary)"><div class="stat-top"><span>Total members</span><span class="stat-icon"><span class="material-symbols-rounded">groups</span></span></div><div id="total-members" class="stat-value">—</div><div class="stat-foot"><span id="member-change" class="trend-positive">—</span><span>new registrations vs prior period</span></div></article>
-            <article class="stat-card" style="--accent:var(--secondary)"><div class="stat-top"><span>Active members</span><span class="stat-icon"><span class="material-symbols-rounded">verified_user</span></span></div><div id="active-members" class="stat-value">—</div><div id="active-share" class="stat-foot">— of total members</div></article>
+            <article class="stat-card active-members-stat-card" style="--accent:var(--primary)"><div class="stat-top"><span>Active members</span><span class="stat-icon"><span class="material-symbols-rounded">verified_user</span></span></div><div id="active-members" class="stat-value">—</div><div id="active-share" class="stat-foot">— of total members</div></article>
+            <article class="stat-card" style="--accent:var(--secondary)"><div class="stat-top"><span>Total members</span><span class="stat-icon"><span class="material-symbols-rounded">groups</span></span></div><div id="total-members" class="stat-value">—</div><div class="stat-foot"><span id="member-change" class="trend-positive">—</span><span>new registrations vs prior period</span></div></article>
             <article class="stat-card" style="--accent:#397b93"><div class="stat-top"><span>Average attendance</span><span class="stat-icon"><span class="material-symbols-rounded">event_available</span></span></div><div id="average-attendance" class="stat-value">—</div><div id="attendance-detail" class="stat-foot">Across events in selected range</div></article>
             <article class="stat-card" style="--accent:var(--danger)"><div class="stat-top"><span>At risk members</span><span class="stat-icon"><span class="material-symbols-rounded">warning</span></span></div><div id="at-risk-members" class="stat-value">—</div><div class="stat-foot"><span id="risk-share">Below 50% attendance</span></div></article>
           </section>
@@ -659,7 +678,7 @@
             <div class="panel-head">
               <div><h3>Members List</h3><p id="members-count-label">Loading members...</p></div>
               <div class="table-tools">
-                <select id="status-filter" class="filter-select" aria-label="Filter membership status"><option value="">All statuses</option><option>Active</option><option>Inactive</option><option>On &amp; Off</option></select>
+                <select id="status-filter" class="filter-select" aria-label="Filter membership status"><option value="">All statuses</option><option selected>Active</option><option>Inactive</option><option>On &amp; Off</option></select>
                 <select id="category-filter" class="filter-select" aria-label="Filter member category"><option value="">All categories</option><option>Junior</option><option>Senior</option></select>
                 <select id="activity-filter" class="filter-select" aria-label="Filter activity status"><option value="">All activity</option><option>Regular</option><option>Active</option><option>At Risk</option></select>
               </div>
@@ -1357,8 +1376,6 @@
       'Weekly Schedule': 'event_repeat', 'Special Events': 'event', 'Event History': 'history', Announcements: 'campaign', Demographics: 'bar_chart',
       Statistics: 'query_stats', Reports: 'description', Settings: 'settings'
     };
-    const lastPageStorageKey = 'attendance-dashboard-last-page';
-
     function apiCall(method, ...args) {
       const key = JSON.stringify([method, args]);
       if (state.apiRequests[key]) return state.apiRequests[key];
@@ -1754,17 +1771,36 @@
       });
     }
 
+    // Priority order: Active = 0, Active Locale = 1, On & Off = 2, Inactive = 3, everything else = 4
+    function memberStatusPriority(member) {
+      const s = String(member.membershipStatus || '').toLowerCase().trim();
+      if (/^active$/.test(s)) return 0;
+      if (/^active locale$/.test(s) || /^active\s+locale/.test(s)) return 1;
+      if (/on\s*[&and]+\s*off|on\s*&\s*off/i.test(s)) return 2;
+      if (/inactive/.test(s)) return 3;
+      return 4;
+    }
+
     function filteredMembers() {
       const query = document.getElementById('global-search').value.trim().toLowerCase();
       const status = document.getElementById('status-filter').value.toLowerCase();
       const category = document.getElementById('category-filter').value.toLowerCase();
       const activity = document.getElementById('activity-filter').value.toLowerCase();
+      // When the user has not manually sorted by a column (default state: sortKey = 'name', direction = 1),
+      // OR when status-filter is not narrowed to a single status, apply the Active-first priority.
+      const applyStatusPriority = !status; // only prioritize when showing mixed statuses
       return (state.data ? state.data.members : []).filter(member =>
         `${member.memberId} ${member.name} ${member.membershipStatus} ${member.category} ${member.activityStatus}`.toLowerCase().includes(query) &&
         (!status || member.membershipStatus.toLowerCase() === status) &&
         (!category || member.category.toLowerCase() === category) &&
         (!activity || member.activityStatus.toLowerCase() === activity)
       ).sort((a, b) => {
+        // Primary: membership status priority (Active first) — unless user filtered to one status
+        if (applyStatusPriority) {
+          const priorityDiff = memberStatusPriority(a) - memberStatusPriority(b);
+          if (priorityDiff !== 0) return priorityDiff;
+        }
+        // Secondary: user-selected sort column
         let first = a[state.sortKey]; let second = b[state.sortKey];
         if (first === null || first === undefined) first = '';
         if (second === null || second === undefined) second = '';
@@ -1810,6 +1846,7 @@
 
     function renderMembers() {
       if (!state.data) return;
+      const status = document.getElementById('status-filter').value.toLowerCase();
       const members = filteredMembers();
       const totalPages = Math.max(1, Math.ceil(members.length / state.pageSize));
       state.pageIndex = Math.min(state.pageIndex, totalPages);
@@ -1822,14 +1859,38 @@
         cell.colSpan = 8; cell.textContent = 'No members match the selected filters.'; cell.className = 'empty-state';
         row.appendChild(cell); tbody.appendChild(row);
       }
+      let lastPriority = -1;
       visible.forEach(member => {
+        const priority = memberStatusPriority(member);
+        // Insert a subtle visual divider row when transitioning between status groups
+        if (!status && priority !== lastPriority && lastPriority !== -1) {
+          const dividerRow = document.createElement('tr');
+          dividerRow.className = 'member-group-divider';
+          const dividerCell = document.createElement('td');
+          dividerCell.colSpan = 8;
+          const groupLabels = ['Active', 'Active Locale', 'On & Off', 'Inactive', 'Other'];
+          dividerCell.textContent = groupLabels[priority] || 'Other';
+          dividerRow.appendChild(dividerCell);
+          tbody.appendChild(dividerRow);
+        }
+        lastPriority = priority;
+
         const row = document.createElement('tr'); row.className = 'member-row'; row.tabIndex = 0; row.setAttribute('aria-expanded', String(state.expandedMember === member.memberId));
         const values = [member.memberId, member.name || 'Name not recorded', member.membershipStatus, member.category, member.activityStatus, member.lastAttendanceDate || 'Not recorded', formatPercent(member.attendancePercent)];
         values.forEach((value, index) => {
           const cell = document.createElement('td');
           if (index === 0) { cell.className = 'member-id-cell'; cell.textContent = value; }
           else if (index === 1) { cell.className = 'member-name-cell'; cell.textContent = value; }
-          else if (index === 4 || index === 2) { const badge = document.createElement('span'); badge.className = `badge ${index === 2 ? (/^active$/i.test(value) ? 'badge-green' : 'badge-amber') : badgeClass(member)}`; badge.textContent = value; cell.appendChild(badge); }
+          else if (index === 2) {
+            // Membership Status badge — color by priority
+            const badge = document.createElement('span');
+            const p = memberStatusPriority(member);
+            const cls = p === 0 ? 'badge-green' : p === 1 ? 'badge-blue' : p === 2 ? 'badge-amber' : p === 3 ? 'badge-red' : 'badge-muted';
+            badge.className = `badge ${cls}`;
+            badge.textContent = value;
+            cell.appendChild(badge);
+          }
+          else if (index === 4) { const badge = document.createElement('span'); badge.className = `badge ${badgeClass(member)}`; badge.textContent = value; cell.appendChild(badge); }
           else cell.textContent = value;
           row.appendChild(cell);
         });
@@ -1879,7 +1940,6 @@
 
     function navigateTo(page) {
       state.page = page;
-      localStorage.setItem(lastPageStorageKey, page);
       document.querySelectorAll('.nav-link').forEach(link => {
         const active = link.dataset.page === page;
         link.classList.toggle('active', active);
@@ -2088,9 +2148,7 @@
     window.setInterval(() => {
       if (state.page === 'Dashboard') loadDashboard(false, true);
     }, 5 * 60 * 1000);
-    const savedPage = localStorage.getItem(lastPageStorageKey);
-    const savedPageIsAvailable = Array.from(document.querySelectorAll('.nav-link')).some(link => link.dataset.page === savedPage);
-    navigateTo(savedPageIsAvailable ? savedPage : 'Dashboard');
+    navigateTo('Members');
         function parseGatheringTime(value) {
           const text = String(value || '').trim();
           const match = text.match(/^(\d{1,2})(?::(\d{2}))?(?::\d{2})?\s*(AM|PM)?$/i);
