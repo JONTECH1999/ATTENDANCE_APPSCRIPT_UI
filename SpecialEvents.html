@@ -1,10 +1,19 @@
 <section id="special-events-page" class="module-view" hidden>
   <div class="module-titlebar">
     <div><p class="eyebrow">One-time gatherings</p><h2>Special Events</h2><p id="special-event-count" class="module-caption">Loading special events...</p></div>
-    <button id="create-special-event-button" class="module-button primary" type="button"><span class="material-symbols-rounded">add</span>Create Special Event</button>
+    <div style="display:flex;gap:8px;">
+      <button id="event-trash-button" class="module-button" type="button"><span class="material-symbols-rounded">delete</span>Archive Trash <span id="event-trash-count" class="count-chip">0</span></button>
+      <button id="create-special-event-button" class="module-button primary" type="button"><span class="material-symbols-rounded">add</span>Create Special Event</button>
+    </div>
   </div>
   <div id="special-event-list" class="special-event-list"><section class="module-panel module-empty">Loading special events...</section></div>
 </section>
+
+<dialog id="event-trash-dialog" class="module-dialog">
+  <div class="dialog-heading"><div><p class="eyebrow">30-day retention archive</p><h2>Event Archive Trash</h2></div><button class="icon-button" type="button" data-close-dialog="event-trash-dialog" aria-label="Close"><span class="material-symbols-rounded">close</span></button></div>
+  <p class="module-help">Archived events and their schedules are kept for 30 days before permanent deletion. You can restore them anytime.</p>
+  <div class="module-table-scroll"><table class="module-table"><thead><tr><th>Event ID</th><th>Event Name</th><th>Archived On</th><th>Actions</th></tr></thead><tbody id="trash-event-rows"><tr><td colspan="4" class="module-empty">Loading trash...</td></tr></tbody></table></div>
+</dialog>
 
 <dialog id="special-event-dialog" class="module-dialog">
   <form id="special-event-form" method="dialog">
@@ -26,9 +35,18 @@
 <script>
   const specialEventsState = { events: [] };
 
+  async function updateEventTrashCount() {
+    try {
+      const trashList = await apiCall('getDeletedEvents');
+      const badge = document.getElementById('event-trash-count');
+      if (badge) badge.textContent = formatNumber(trashList.length);
+    } catch (e) {}
+  }
+
   async function loadSpecialEvents() {
     if (state.page !== 'Special Events') return;
     try {
+      updateEventTrashCount();
       specialEventsState.events = await apiCall('getSpecialEvents');
       renderSpecialEvents();
       state.loadedPages['Special Events'] = true;
@@ -98,10 +116,74 @@
         });
         actions.appendChild(history);
       }
+
+      // Delete (Archive with 30-day retention) action
+      const delBtn = document.createElement('button');
+      delBtn.type = 'button';
+      delBtn.className = 'module-button danger-outline';
+      delBtn.innerHTML = '<span class="material-symbols-rounded">delete</span>Archive Event';
+      delBtn.title = 'Move to Archive Trash (retained 30 days before permanent delete)';
+      delBtn.addEventListener('click', () => archiveEventFromPage(event));
+      actions.appendChild(delBtn);
+
       body.append(description, programLabel, program, actions);
       card.append(header, body);
       list.appendChild(card);
     });
+  }
+
+  async function archiveEventFromPage(event) {
+    if (!window.confirm(`Move "${event.name}" (${event.eventId}) to Archive Trash?\n\nIt will be retained for 30 days, then permanently deleted.`)) return;
+    try {
+      const result = await apiCall('moveEventToTrash', event.eventId);
+      showToast(result.message, 'success');
+      await loadSpecialEvents();
+      refreshLiveGatheringEvents();
+    } catch (err) {
+      showToast(err.message || 'Unable to archive event.', 'error');
+    }
+  }
+
+  async function openEventTrashModal() {
+    const dialog = document.getElementById('event-trash-dialog');
+    const tbody = document.getElementById('trash-event-rows');
+    tbody.innerHTML = '<tr><td colspan="4" class="module-empty">Loading trash records...</td></tr>';
+    dialog.showModal();
+    try {
+      const trashList = await apiCall('getDeletedEvents');
+      document.getElementById('event-trash-count').textContent = formatNumber(trashList.length);
+      tbody.replaceChildren();
+      if (!trashList.length) {
+        tbody.innerHTML = '<tr><td colspan="4" class="module-empty">No events in trash.</td></tr>';
+        return;
+      }
+      trashList.forEach(item => {
+        const tr = document.createElement('tr');
+        const tdId = document.createElement('td'); tdId.className = 'id-cell'; tdId.textContent = item.eventId;
+        const tdName = document.createElement('td'); tdName.textContent = item.name;
+        const tdDate = document.createElement('td'); tdDate.textContent = item.deletedAt || 'Recently';
+        const tdAct = document.createElement('td');
+        const restoreBtn = document.createElement('button');
+        restoreBtn.className = 'module-button success-outline';
+        restoreBtn.innerHTML = '<span class="material-symbols-rounded">restore_from_trash</span>Restore';
+        restoreBtn.onclick = async () => {
+          try {
+            const res = await apiCall('restoreDeletedEvent', item.eventId);
+            showToast(res.message, 'success');
+            await openEventTrashModal();
+            await loadSpecialEvents();
+            refreshLiveGatheringEvents();
+          } catch (e) {
+            showToast(e.message || 'Unable to restore event.', 'error');
+          }
+        };
+        tdAct.appendChild(restoreBtn);
+        tr.append(tdId, tdName, tdDate, tdAct);
+        tbody.appendChild(tr);
+      });
+    } catch (err) {
+      tbody.innerHTML = `<tr><td colspan="4" class="module-empty">${err.message || 'Unable to load trash.'}</td></tr>`;
+    }
   }
 
   function openSpecialEventDialog() {
@@ -130,5 +212,6 @@
   }
 
   document.getElementById('create-special-event-button').addEventListener('click', openSpecialEventDialog);
+  document.getElementById('event-trash-button').addEventListener('click', openEventTrashModal);
   document.getElementById('special-event-form').addEventListener('submit', submitSpecialEvent);
 </script>

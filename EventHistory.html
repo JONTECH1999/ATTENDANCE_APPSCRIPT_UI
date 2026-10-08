@@ -1,7 +1,14 @@
 <section id="event-history-page" class="module-view" hidden>
   <div class="module-titlebar">
-    <div><p class="eyebrow">Saved attendance records</p><h2>Event History</h2><p class="module-caption">Read-only event details and attendance. Member profile fields show their current values.</p></div>
-    <button id="refresh-event-history" class="module-button" type="button"><span class="material-symbols-rounded">refresh</span>Refresh History</button>
+    <div>
+      <p class="eyebrow">Saved attendance records</p>
+      <h2>Event History</h2>
+      <p class="module-caption">Read-only event details and attendance. Member profile fields show their current values.</p>
+    </div>
+    <div style="display:flex;gap:8px;">
+      <button id="event-history-trash-button" class="module-button" type="button"><span class="material-symbols-rounded">delete</span>Archive Trash <span id="event-history-trash-count" class="count-chip">0</span></button>
+      <button id="refresh-event-history" class="module-button" type="button"><span class="material-symbols-rounded">refresh</span>Refresh History</button>
+    </div>
   </div>
   <div class="event-history-layout">
     <section class="module-panel event-history-list-panel">
@@ -14,12 +21,41 @@
   </div>
 </section>
 
+<dialog id="event-history-trash-dialog" class="module-dialog">
+  <div class="dialog-heading">
+    <div>
+      <p class="eyebrow">30-day retention archive</p>
+      <h2>Event History Archive Trash</h2>
+    </div>
+    <button class="icon-button" type="button" data-close-dialog="event-history-trash-dialog" aria-label="Close"><span class="material-symbols-rounded">close</span></button>
+  </div>
+  <p class="module-help">Archived past event attendance records are preserved for 30 days before permanent deletion. Restoring returns the attendance records and recalculates member rollups automatically.</p>
+  <div class="module-table-scroll">
+    <table class="module-table">
+      <thead>
+        <tr>
+          <th>Event Name</th>
+          <th>Event Date</th>
+          <th>Schedule</th>
+          <th>Attendees</th>
+          <th>Archived On</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody id="trash-event-history-rows">
+        <tr><td colspan="6" class="module-empty">Loading trash records...</td></tr>
+      </tbody>
+    </table>
+  </div>
+</dialog>
+
 <script>
   const eventHistoryState = { occurrences: [], selectedKey: '', pendingSelection: null };
 
   async function loadEventHistory() {
     if (state.page !== 'Event History') return;
     try {
+      updateHistoryTrashCount();
       eventHistoryState.occurrences = await apiCall('getEventHistory');
       renderEventHistoryList();
       const requested = eventHistoryState.pendingSelection;
@@ -47,9 +83,17 @@
       return;
     }
     eventHistoryState.occurrences.forEach(item => {
+      const rowWrap = document.createElement('div');
+      rowWrap.className = 'event-history-row';
+      rowWrap.style.display = 'flex';
+      rowWrap.style.alignItems = 'stretch';
+      rowWrap.style.borderBottom = '1px solid var(--line)';
+
       const button = document.createElement('button');
       button.type = 'button';
       button.className = `event-history-item${item.key === eventHistoryState.selectedKey ? ' selected' : ''}`;
+      button.style.flex = '1';
+      button.style.borderBottom = '0';
       button.setAttribute('aria-pressed', String(item.key === eventHistoryState.selectedKey));
       const title = document.createElement('strong');
       title.textContent = item.eventName;
@@ -59,7 +103,22 @@
       count.textContent = `${formatNumber(item.attendanceCount)} attendance record(s)`;
       button.append(title, subtitle, count);
       button.addEventListener('click', event => window.runButtonAction(event.currentTarget, () => selectEventHistory(item.key), 'Loading...'));
-      list.appendChild(button);
+
+      const delBtn = document.createElement('button');
+      delBtn.type = 'button';
+      delBtn.className = 'icon-button';
+      delBtn.title = 'Archive this past event attendance (retained 30 days)';
+      delBtn.style.alignSelf = 'center';
+      delBtn.style.marginRight = '8px';
+      delBtn.style.color = 'var(--muted)';
+      delBtn.innerHTML = '<span class="material-symbols-rounded">delete</span>';
+      delBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        archivePastEventAttendance(item);
+      });
+
+      rowWrap.append(button, delBtn);
+      list.appendChild(rowWrap);
     });
   }
 
@@ -90,13 +149,30 @@
     const panel = document.getElementById('event-history-detail');
     panel.replaceChildren();
     const event = details.event;
+
     const heading = document.createElement('header');
     heading.className = 'event-history-detail-heading';
+    heading.style.display = 'flex';
+    heading.style.justifyContent = 'space-between';
+    heading.style.alignItems = 'flex-start';
+    heading.style.gap = '12px';
+
+    const titleGroup = document.createElement('div');
     const title = document.createElement('h3');
     title.textContent = event.eventName;
     const meta = document.createElement('p');
     meta.textContent = [event.category, event.eventDate, formatScheduleName(event.scheduleName), event.time ? formatScheduleTime(event.time) : '', event.location].filter(Boolean).join(' · ');
-    heading.append(title, meta);
+    titleGroup.append(title, meta);
+
+    const archiveBtn = document.createElement('button');
+    archiveBtn.type = 'button';
+    archiveBtn.className = 'module-button danger-outline';
+    archiveBtn.innerHTML = '<span class="material-symbols-rounded">delete</span>Archive This Event Attendance';
+    archiveBtn.title = 'Move attendance records to Archive Trash (30-day retention)';
+    archiveBtn.addEventListener('click', () => archivePastEventAttendance(event));
+
+    heading.append(titleGroup, archiveBtn);
+
     const summary = document.createElement('div');
     summary.className = 'event-history-summary';
     [['Present', event.present], ['Absent', event.absent], ['Late', event.late], ['Excused', event.excused], ['Total records', event.attendanceCount]].forEach(([label, value]) => {
@@ -128,7 +204,7 @@
     const table = document.createElement('table');
     table.className = 'module-table event-history-table';
     const head = table.createTHead().insertRow();
-    ['Member ID', 'Name', 'Category', 'Membership', 'Status', 'Committees'].forEach(label => {
+    ['Member ID', 'Name', 'Contact', 'Category', 'Membership', 'Attendance Status', 'Student Status', 'Employment', 'Committees', 'Recorded By'].forEach(label => {
       const cell = document.createElement('th');
       cell.textContent = label;
       head.appendChild(cell);
@@ -137,22 +213,111 @@
     if (!details.attendees.length) {
       const row = body.insertRow();
       const cell = row.insertCell();
-      cell.colSpan = 6;
+      cell.colSpan = 10;
       cell.className = 'module-empty';
       cell.textContent = 'No attendance records were saved for this event.';
     }
     details.attendees.forEach(attendee => {
       const row = body.insertRow();
-      [attendee.memberId, attendee.name, attendee.member && attendee.member.category || 'Not recorded', attendee.member && attendee.member.membershipStatus || 'Not recorded', attendee.status, attendee.member && attendee.member.committees || 'Not recorded'].forEach(value => {
-        const cell = row.insertCell();
-        cell.textContent = value || 'Not recorded';
-      });
+      const statusTone = /present/i.test(attendee.status) ? 'green' : /late/i.test(attendee.status) ? 'amber' : /absent/i.test(attendee.status) ? 'red' : 'blue';
+      const mStatus = attendee.membershipStatus || (attendee.member && attendee.member.membershipStatus) || '—';
+      const mCategory = attendee.category || (attendee.member && attendee.member.category) || '—';
+      const sStatus = attendee.studentStatus || (attendee.member && attendee.member.studentStatus) || '—';
+      const eStatus = attendee.employmentStatus || (attendee.member && attendee.member.employmentStatus) || '—';
+      const comms = attendee.committees || (attendee.member && attendee.member.committees) || '—';
+      const contact = attendee.contactNumber || (attendee.member && attendee.member.contactNumber) || '—';
+
+      const cId = row.insertCell(); cId.className = 'id-cell'; cId.textContent = attendee.memberId;
+      const cName = row.insertCell(); cName.innerHTML = `<strong>${escapeHtml(attendee.name)}</strong>`;
+      const cContact = row.insertCell(); cContact.textContent = contact;
+      const cCat = row.insertCell(); cCat.appendChild(makeBadge(mCategory, 'purple'));
+      const cMem = row.insertCell(); cMem.appendChild(makeBadge(mStatus, /active/i.test(mStatus) ? 'green' : 'amber'));
+      const cStatus = row.insertCell(); cStatus.appendChild(makeBadge(attendee.status, statusTone));
+      const cStudent = row.insertCell(); cStudent.textContent = sStatus;
+      const cEmp = row.insertCell(); cEmp.textContent = eStatus;
+      const cComms = row.insertCell(); cComms.textContent = comms;
+      const cRecorded = row.insertCell(); cRecorded.textContent = attendee.recordedBy ? `${attendee.recordedBy}` : '—';
     });
     tableWrap.appendChild(table);
     const footnote = document.createElement('p');
     footnote.className = 'module-help';
-    footnote.textContent = 'Attendance statuses are historical. Member category, membership, and committee values are current profile data, not an event-time snapshot.';
+    footnote.textContent = 'Attendance statuses are historical. Member category, membership, student, and committee values are current profile data synchronized with MEMBERS.';
     panel.append(heading, summary, assignments, description, programTitle, program, attendeeTitle, tableWrap, footnote);
+  }
+
+  async function archivePastEventAttendance(item) {
+    if (!item) return;
+    const eventName = item.eventName || item.name || 'Event';
+    const eventDate = item.eventDate || item.date || '';
+    const count = item.attendanceCount !== undefined ? item.attendanceCount : (item.present || 0) + (item.absent || 0) + (item.late || 0) + (item.excused || 0);
+
+    if (!window.confirm(`Move past event "${eventName}" on ${eventDate} (${formatNumber(count)} attendance record(s)) to Archive Trash?\n\nRecords will be retained for 30 days before permanent deletion. Member attendance statistics and percentages will be recalculated automatically.`)) {
+      return;
+    }
+
+    try {
+      const result = await apiCall('deleteEventHistoryOccurrence', item.eventId, item.scheduleId, eventDate);
+      showToast(result.message || 'Archived past event to 30-day trash.', 'success');
+      eventHistoryState.selectedKey = '';
+      await loadEventHistory();
+      await updateHistoryTrashCount();
+    } catch (err) {
+      showToast(err.message || 'Unable to archive event attendance.', 'error');
+    }
+  }
+
+  async function updateHistoryTrashCount() {
+    try {
+      const trashList = await apiCall('getDeletedEventHistory');
+      const badge = document.getElementById('event-history-trash-count');
+      if (badge) badge.textContent = formatNumber(trashList.length);
+    } catch (e) {
+      // ignore
+    }
+  }
+
+  async function openHistoryTrashModal() {
+    const dialog = document.getElementById('event-history-trash-dialog');
+    const tbody = document.getElementById('trash-event-history-rows');
+    tbody.innerHTML = '<tr><td colspan="6" class="module-empty">Loading trash records...</td></tr>';
+    dialog.showModal();
+    try {
+      const trashList = await apiCall('getDeletedEventHistory');
+      const badge = document.getElementById('event-history-trash-count');
+      if (badge) badge.textContent = formatNumber(trashList.length);
+      tbody.replaceChildren();
+      if (!trashList.length) {
+        tbody.innerHTML = '<tr><td colspan="6" class="module-empty">No past event records in trash.</td></tr>';
+        return;
+      }
+      trashList.forEach(item => {
+        const tr = document.createElement('tr');
+        const tdName = document.createElement('td'); tdName.innerHTML = `<strong>${escapeHtml(item.eventName)}</strong>`;
+        const tdDate = document.createElement('td'); tdDate.textContent = item.eventDate;
+        const tdSched = document.createElement('td'); tdSched.textContent = item.scheduleName || '—';
+        const tdCount = document.createElement('td'); tdCount.textContent = `${formatNumber(item.recordCount)} records`;
+        const tdDel = document.createElement('td'); tdDel.textContent = item.deletedAt ? item.deletedAt : 'Recently';
+        const tdAct = document.createElement('td');
+        const restoreBtn = document.createElement('button');
+        restoreBtn.className = 'module-button success-outline';
+        restoreBtn.innerHTML = '<span class="material-symbols-rounded">restore_from_trash</span>Restore';
+        restoreBtn.onclick = async () => {
+          try {
+            const res = await apiCall('restoreDeletedEventHistory', item.archiveId);
+            showToast(res.message, 'success');
+            await openHistoryTrashModal();
+            await loadEventHistory();
+          } catch (e) {
+            showToast(e.message || 'Unable to restore event attendance.', 'error');
+          }
+        };
+        tdAct.appendChild(restoreBtn);
+        tr.append(tdName, tdDate, tdSched, tdCount, tdDel, tdAct);
+        tbody.appendChild(tr);
+      });
+    } catch (err) {
+      tbody.innerHTML = `<tr><td colspan="6" class="module-empty">${err.message || 'Unable to load trash.'}</td></tr>`;
+    }
   }
 
   function historyDetailField(label, value) {
@@ -181,4 +346,5 @@
   }
 
   document.getElementById('refresh-event-history').addEventListener('click', event => window.runButtonAction(event.currentTarget, loadEventHistory, 'Refreshing...'));
+  document.getElementById('event-history-trash-button').addEventListener('click', openHistoryTrashModal);
 </script>

@@ -411,3 +411,45 @@
     </div>
   </div>
 </section>
+
+<script>
+  async function loadReportsModule() {
+    if (state.page !== 'Reports') return;
+    try {
+      const [events, members] = await Promise.all([
+        apiCall('getEventHistory'),
+        apiCall('getAllMembers')
+      ]);
+      renderDynamicReports(events, members);
+      state.loadedPages['Reports'] = true;
+    } catch (err) {
+      console.warn('Reports module load error:', err);
+    }
+  }
+
+  function renderDynamicReports(events, members) {
+    if (Array.isArray(events) && events.length) {
+      const tbody = document.querySelector('#reports-page .report-table tbody');
+      if (tbody) {
+        tbody.replaceChildren();
+        events.slice(0, 15).forEach(evt => {
+          const totalLogs = evt.attendanceCount || 0;
+          const present = evt.present || 0;
+          const rate = totalLogs > 0 ? Math.round((present / totalLogs) * 100) : 0;
+          const badgeClass = rate >= 75 ? 'good' : rate >= 50 ? 'warn' : 'danger';
+          const tr = document.createElement('tr');
+          tr.innerHTML = `<td>${escapeHtml(evt.eventName)}</td>
+            <td>${escapeHtml(evt.category || 'Gathering')}</td>
+            <td>${evt.eventDate}</td>
+            <td>${evt.present || 0}</td>
+            <td>${evt.absent || 0}</td>
+            <td>${evt.late || 0}</td>
+            <td>${evt.excused || 0}</td>
+            <td>${totalLogs}</td>
+            <td><span class="attendance-badge ${badgeClass}">${rate}%</span></td>`;
+          tbody.appendChild(tr);
+        });
+      }
+    }
+  }
+</script>

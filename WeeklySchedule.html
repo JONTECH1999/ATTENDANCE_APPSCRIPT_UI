@@ -1,10 +1,19 @@
 <section id="weekly-schedule-page" class="module-view" hidden>
   <div class="module-titlebar schedule-titlebar">
     <div><p class="eyebrow">Events calendar</p><h2>Weekly Schedule</h2><p id="schedule-week-label" class="module-caption">Loading events and schedules...</p></div>
-    <div class="schedule-week-controls"><button id="schedule-prev-week" class="module-button square-button" type="button" aria-label="Previous week"><span class="material-symbols-rounded">chevron_left</span></button><button id="schedule-today" class="module-button" type="button">This Week</button><button id="schedule-next-week" class="module-button square-button" type="button" aria-label="Next week"><span class="material-symbols-rounded">chevron_right</span></button></div>
+    <div style="display:flex;align-items:center;gap:8px;">
+      <button id="weekly-trash-button" class="module-button" type="button"><span class="material-symbols-rounded">delete</span>Archive Trash</button>
+      <div class="schedule-week-controls"><button id="schedule-prev-week" class="module-button square-button" type="button" aria-label="Previous week"><span class="material-symbols-rounded">chevron_left</span></button><button id="schedule-today" class="module-button" type="button">This Week</button><button id="schedule-next-week" class="module-button square-button" type="button" aria-label="Next week"><span class="material-symbols-rounded">chevron_right</span></button></div>
+    </div>
   </div>
   <div id="weekly-event-list" class="weekly-event-list"><section class="module-panel module-empty">Loading events...</section></div>
 </section>
+
+<dialog id="weekly-trash-dialog" class="module-dialog">
+  <div class="dialog-heading"><div><p class="eyebrow">30-day retention archive</p><h2>Gathering &amp; Event Archive Trash</h2></div><button class="icon-button" type="button" data-close-dialog="weekly-trash-dialog" aria-label="Close"><span class="material-symbols-rounded">close</span></button></div>
+  <p class="module-help">Archived gatherings and their schedules are kept for 30 days before permanent deletion. You can restore them anytime.</p>
+  <div class="module-table-scroll"><table class="module-table"><thead><tr><th>Event ID</th><th>Gathering Name</th><th>Archived On</th><th>Actions</th></tr></thead><tbody id="weekly-trash-rows"><tr><td colspan="4" class="module-empty">Loading trash...</td></tr></tbody></table></div>
+</dialog>
 
 <dialog id="schedule-editor" class="module-dialog">
   <form id="schedule-editor-form" method="dialog">
@@ -50,7 +59,12 @@
 
   async function loadWeeklySchedule() {
     if(state.page!=='Weekly Schedule')return;
-    try{weeklyScheduleState.events=await apiCall('getAttendanceEvents');renderWeeklySchedule();state.loadedPages['Weekly Schedule']=true;}
+    try{
+      updateWeeklyTrashBadge();
+      weeklyScheduleState.events=await apiCall('getAttendanceEvents');
+      renderWeeklySchedule();
+      state.loadedPages['Weekly Schedule']=true;
+    }
     catch(error){showToast(error.message||'Unable to load weekly schedules.','error');}
   }
 
@@ -69,8 +83,11 @@
       const detail=document.createElement('p');detail.textContent=`${event.date||'Dates vary'}  •  ${event.location||'Location not set'}${event.description?`  •  ${event.description}`:''}`;
       info.append(title,badges,detail);
       if(event.program){const program=document.createElement('details');program.className='weekly-event-program';const summary=document.createElement('summary');summary.textContent='View event program';const content=document.createElement('pre');content.textContent=event.program;program.append(summary,content);info.appendChild(program);}
+      const actionsGroup=document.createElement('div');actionsGroup.style.display='flex';actionsGroup.style.gap='6px';
       const add=document.createElement('button');add.type='button';add.className='module-button success-outline';add.innerHTML='<span class="material-symbols-rounded">add</span>Add Schedule';add.addEventListener('click',()=>openScheduleEditor(event.eventId));
-      head.append(info,add);panel.appendChild(head);
+      const delEvent=document.createElement('button');delEvent.type='button';delEvent.className='module-button danger-outline';delEvent.innerHTML='<span class="material-symbols-rounded">delete</span>Archive Gathering';delEvent.title='Move to Archive Trash (retained 30 days)';delEvent.addEventListener('click',()=>archiveGatheringFromWeekly(event));
+      actionsGroup.append(add,delEvent);
+      head.append(info,actionsGroup);panel.appendChild(head);
       const body=document.createElement('div');body.className='event-schedules-body';
       const label=document.createElement('h3');label.textContent=`Assigned Schedules (${event.schedules.length})`;body.appendChild(label);
       const grid=document.createElement('div');grid.className='schedule-card-grid';
@@ -89,7 +106,8 @@
         const actions=document.createElement('div');actions.className='schedule-card-actions';
         const action=document.createElement('button');action.type='button';action.className='schedule-attendance-link';action.innerHTML='<span class="material-symbols-rounded">task_alt</span>Take Attendance';action.addEventListener('click',()=>{const wasLoaded=state.loadedPages['Fast Attendance'];fastAttendanceState.eventId=event.eventId;fastAttendanceState.scheduleId=schedule.scheduleId;fastAttendanceState.date=occurrenceDate;fastAttendanceState.requestedDate=occurrenceDate;fastAttendanceState.scheduleWasManuallySelected=true;navigateTo('Fast Attendance');if(wasLoaded)loadFastAttendance();});
         const edit=document.createElement('button');edit.type='button';edit.className='schedule-attendance-link';edit.innerHTML='<span class="material-symbols-rounded">edit</span>Edit Schedule';edit.addEventListener('click',()=>openScheduleEditor(event.eventId,schedule));
-        actions.append(action,edit);
+        const delSch=document.createElement('button');delSch.type='button';delSch.className='schedule-attendance-link';delSch.style.color='#d32f2f';delSch.innerHTML='<span class="material-symbols-rounded">delete</span>Archive';delSch.title='Move schedule to Archive Trash (retained 30 days)';delSch.addEventListener('click',()=>archiveScheduleFromWeekly(event,schedule));
+        actions.append(action,edit,delSch);
         card.append(cardTitle,scheduleId,date,time,location,mpro,officers,actions);grid.appendChild(card);
       });
       body.appendChild(grid);panel.appendChild(body);list.appendChild(panel);
@@ -130,7 +148,113 @@
     },data.scheduleId?'Updating...':'Saving...');
   }
 
+  async function archiveGatheringFromWeekly(event) {
+    if (!window.confirm(`Move gathering "${event.name}" (${event.eventId}) and all its schedules to Archive Trash?\n\nIt will be retained for 30 days before permanent deletion.`)) return;
+    try {
+      const result = await apiCall('moveEventToTrash', event.eventId);
+      showToast(result.message, 'success');
+      await loadWeeklySchedule();
+      refreshLiveGatheringEvents();
+    } catch (err) {
+      showToast(err.message || 'Unable to archive gathering.', 'error');
+    }
+  }
+
+  async function archiveScheduleFromWeekly(event, schedule) {
+    const sName = schedule.name || `${schedule.dayOfWeek || ''} ${schedule.time || ''}`.trim() || 'Schedule';
+    if (!window.confirm(`Move schedule "${sName}" (${schedule.scheduleId}) of "${event.name}" to Archive Trash?\n\nIt will be retained for 30 days before permanent deletion.`)) return;
+    try {
+      const result = await apiCall('moveScheduleToTrash', schedule.scheduleId);
+      showToast(result.message, 'success');
+      await loadWeeklySchedule();
+      refreshLiveGatheringEvents();
+    } catch (err) {
+      showToast(err.message || 'Unable to archive schedule.', 'error');
+    }
+  }
+
+  async function updateWeeklyTrashBadge() {
+    try {
+      const events = await apiCall('getDeletedEvents');
+      const schedules = await apiCall('getDeletedSchedules');
+      const count = (events.length || 0) + (schedules.length || 0);
+      const badge = document.getElementById('weekly-trash-count');
+      if (badge) badge.textContent = formatNumber(count);
+    } catch (e) {}
+  }
+
+  async function openWeeklyTrashModal() {
+    const dialog = document.getElementById('weekly-trash-dialog');
+    const tbody = document.getElementById('weekly-trash-rows');
+    tbody.innerHTML = '<tr><td colspan="4" class="module-empty">Loading trash records...</td></tr>';
+    dialog.showModal();
+    try {
+      const [eventsList, schedulesList] = await Promise.all([
+        apiCall('getDeletedEvents'),
+        apiCall('getDeletedSchedules')
+      ]);
+      updateWeeklyTrashBadge();
+      tbody.replaceChildren();
+      if (!eventsList.length && !schedulesList.length) {
+        tbody.innerHTML = '<tr><td colspan="4" class="module-empty">No events or schedules in trash.</td></tr>';
+        return;
+      }
+      eventsList.forEach(item => {
+        const tr = document.createElement('tr');
+        const tdId = document.createElement('td'); tdId.className = 'id-cell'; tdId.textContent = item.eventId;
+        const tdName = document.createElement('td'); tdName.innerHTML = `<strong>${escapeHtml(item.name)}</strong> <small style="color:var(--muted);">(Gathering)</small>`;
+        const tdDate = document.createElement('td'); tdDate.textContent = item.deletedAt || 'Recently';
+        const tdAct = document.createElement('td');
+        const restoreBtn = document.createElement('button');
+        restoreBtn.className = 'module-button success-outline';
+        restoreBtn.innerHTML = '<span class="material-symbols-rounded">restore_from_trash</span>Restore';
+        restoreBtn.onclick = async () => {
+          try {
+            const res = await apiCall('restoreDeletedEvent', item.eventId);
+            showToast(res.message, 'success');
+            await openWeeklyTrashModal();
+            await loadWeeklySchedule();
+            refreshLiveGatheringEvents();
+          } catch (e) {
+            showToast(e.message || 'Unable to restore gathering.', 'error');
+          }
+        };
+        tdAct.appendChild(restoreBtn);
+        tr.append(tdId, tdName, tdDate, tdAct);
+        tbody.appendChild(tr);
+      });
+      schedulesList.forEach(item => {
+        const tr = document.createElement('tr');
+        const tdId = document.createElement('td'); tdId.className = 'id-cell'; tdId.textContent = item.scheduleId;
+        const schedLabel = [item.name, item.dayOfWeek, item.time ? formatScheduleTime(item.time) : ''].filter(Boolean).join(' · ');
+        const tdName = document.createElement('td'); tdName.innerHTML = `<strong>${escapeHtml(schedLabel)}</strong> <small style="color:var(--muted);">(Schedule)</small>`;
+        const tdDate = document.createElement('td'); tdDate.textContent = item.deletedAt || 'Recently';
+        const tdAct = document.createElement('td');
+        const restoreBtn = document.createElement('button');
+        restoreBtn.className = 'module-button success-outline';
+        restoreBtn.innerHTML = '<span class="material-symbols-rounded">restore_from_trash</span>Restore';
+        restoreBtn.onclick = async () => {
+          try {
+            const res = await apiCall('restoreDeletedSchedule', item.scheduleId);
+            showToast(res.message, 'success');
+            await openWeeklyTrashModal();
+            await loadWeeklySchedule();
+            refreshLiveGatheringEvents();
+          } catch (e) {
+            showToast(e.message || 'Unable to restore schedule.', 'error');
+          }
+        };
+        tdAct.appendChild(restoreBtn);
+        tr.append(tdId, tdName, tdDate, tdAct);
+        tbody.appendChild(tr);
+      });
+    } catch (err) {
+      tbody.innerHTML = `<tr><td colspan="4" class="module-empty">${err.message || 'Unable to load trash.'}</td></tr>`;
+    }
+  }
+
   function bindWeeklySchedulePage() {
+    document.getElementById('weekly-trash-button').addEventListener('click', openWeeklyTrashModal);
     document.getElementById('schedule-prev-week').addEventListener('click',()=>{weeklyScheduleState.weekOffset-=1;renderWeeklySchedule();});
     document.getElementById('schedule-next-week').addEventListener('click',()=>{weeklyScheduleState.weekOffset+=1;renderWeeklySchedule();});
     document.getElementById('schedule-today').addEventListener('click',()=>{weeklyScheduleState.weekOffset=0;renderWeeklySchedule();});

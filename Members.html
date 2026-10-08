@@ -43,14 +43,18 @@
       <label>Birthday<input id="edit-member-birthday" name="birthday" type="date"></label>
       <label>Sabbath Date<input id="edit-member-sabbath-date" name="sabbathDate" type="date"></label>
       <label>Gender<select id="edit-member-gender" name="gender"><option value="">Select</option><option>Female</option><option>Male</option><option>Other</option></select></label>
-      <label>Membership status<select id="edit-member-status" name="membershipStatus"><option>Active</option><option>Inactive</option><option>On &amp; Off</option></select></label>
+      <label>Membership status<select id="edit-member-status" name="membershipStatus"><option>Active</option><option>Inactive</option><option>Active Locale</option><option>On &amp; Off</option></select></label>
       <label>Category<select id="edit-member-category" name="category"><option>Junior</option><option>Senior</option></select></label>
-      <label>Student status<select id="edit-member-student" name="studentStatus"><option>Student</option><option>Non-Student</option></select></label>
-      <label>Employment status<select id="edit-member-employment" name="employmentStatus"><option>Unemployed</option><option>Employed</option></select></label>
-      <label class="form-wide">Committees<input id="edit-member-committees" name="committees" placeholder="Separate multiple committees with commas"></label>
+      <label>Student status<select id="edit-member-student" name="studentStatus"><option value="NONE">NONE</option><option value="GRADUATED">GRADUATED</option><option value="1ST YEAR">1ST YEAR</option><option value="2ND YEAR">2ND YEAR</option><option value="3RD YEAR">3RD YEAR</option><option value="4TH YEAR">4TH YEAR</option><option value="NOT YET">NOT YET</option><option value="Student">Student</option></select></label>
+      <label>Employment status<select id="edit-member-employment" name="employmentStatus"><option value="EMPLOYED">EMPLOYED</option><option value="STUDENT">STUDENT</option><option value="SELF EMPLOYED">SELF EMPLOYED</option><option value="UNEMPLOYED WITH FINANCIAL RESOURCES">UNEMPLOYED W/ RESOURCES</option><option value="UNEMPLOYED">UNEMPLOYED</option></select></label>
+      <label>Registered Voter (18+)<select id="edit-member-voter" name="registeredVoter"><option value="N">No (N)</option><option value="Y">Yes (Y)</option></select></label>
+      <label>Working Student<select id="edit-member-working-student" name="workingStudent"><option value="N">No (N)</option><option value="Y">Yes (Y)</option></select></label>
+      <label>Out of School Youth<select id="edit-member-osy" name="outOfSchoolYouth"><option value="N">No (N)</option><option value="Y">Yes (Y)</option></select></label>
+      <label>Parent Baptism Status<select id="edit-member-baptism" name="parentBaptismStatus"><option value="">Not Specified</option><option value="Both Mother &amp; Father">Both Mother &amp; Father</option><option value="Mother Only">Mother Only</option><option value="Father Only">Father Only</option><option value="Unbaptized Parent/s">Unbaptized Parent/s</option></select></label>
+      <label class="form-wide">Committees<input id="edit-member-committees" name="committees" placeholder="e.g. MUSIC MINISTRY, TEATRO KRISTYANO, KATANDAAN OFFICER"></label>
       <label class="form-wide">Notes<textarea id="edit-member-notes" name="notes" rows="3"></textarea></label>
     </div>
-    <p class="module-help">Birthday and Sabbath Date columns are added to MEMBERS automatically if they are missing.</p>
+    <p class="module-help">Clean formatting: Phone numbers automatically normalize to +639 format. Dates sync with official demographic &amp; attendance tabs.</p>
     <div class="dialog-actions"><button class="module-button" type="button" data-close-dialog="member-editor">Cancel</button><button id="save-member-button" class="module-button primary" type="submit">Save Member</button></div>
   </form>
 </dialog>
@@ -168,8 +172,12 @@
     document.getElementById('edit-member-gender').value = member ? member.gender : '';
     document.getElementById('edit-member-status').value = member ? member.membershipStatus : 'Active';
     document.getElementById('edit-member-category').value = member ? member.category : 'Junior';
-    document.getElementById('edit-member-student').value = member ? member.studentStatus : 'Student';
-    document.getElementById('edit-member-employment').value = member ? member.employmentStatus : 'Unemployed';
+    document.getElementById('edit-member-student').value = member ? (member.studentStatus || 'NONE') : 'NONE';
+    document.getElementById('edit-member-employment').value = member ? (member.employmentStatus || 'EMPLOYED') : 'EMPLOYED';
+    document.getElementById('edit-member-voter').value = member ? (String(member.registeredVoter || 'N').toUpperCase().startsWith('Y') ? 'Y' : 'N') : 'N';
+    document.getElementById('edit-member-working-student').value = member ? (String(member.workingStudent || 'N').toUpperCase().startsWith('Y') ? 'Y' : 'N') : 'N';
+    document.getElementById('edit-member-osy').value = member ? (String(member.outOfSchoolYouth || 'N').toUpperCase().startsWith('Y') ? 'Y' : 'N') : 'N';
+    document.getElementById('edit-member-baptism').value = member ? (member.parentBaptismStatus || '') : '';
     document.getElementById('edit-member-committees').value = member ? member.committees : '';
     document.getElementById('edit-member-notes').value = member ? member.notes : '';
     document.getElementById('member-editor').showModal();

@@ -1812,6 +1812,9 @@
       if (page === 'Weekly Schedule') loadModuleOnce(page, loadWeeklySchedule);
       if (page === 'Special Events') loadModuleOnce(page, loadSpecialEvents);
       if (page === 'Event History') loadModuleOnce(page, loadEventHistory);
+      if (page === 'Demographics' && typeof loadDemographicsPage === 'function') loadModuleOnce(page, loadDemographicsPage);
+      if (page === 'Statistics' && typeof loadStatisticsModule === 'function') loadModuleOnce(page, loadStatisticsModule);
+      if (page === 'Reports' && typeof loadReportsModule === 'function') loadModuleOnce(page, loadReportsModule);
     }
 
     function openMobileNav() { document.getElementById('sidebar').classList.add('open'); document.getElementById('mobile-overlay').classList.add('show'); }

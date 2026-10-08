@@ -2,6 +2,11 @@ function onOpen() {
   SpreadsheetApp.getUi()
     .createMenu('Attendance Monitor')
     .addItem('Open Attendance Dashboard', 'openAttendanceDashboard')
+    .addItem('Clean & Normalize MEMBERS Data', 'cleanAndNormalizeMembersData')
+    .addItem('Setup Sheet Validations & Dropdowns', 'setupSheetValidations')
+    .addItem('Sync Member Attendance Rollups', 'syncMemberAttendanceRollups')
+    .addItem('Purge Expired Trash (30+ Days Old)', 'cleanupExpiredTrash30Days')
+    .addSeparator()
     .addItem('Prepare Web App Access', 'prepareAttendanceWebApp')
     .addToUi();
 }
@@ -215,7 +220,21 @@ function attendancePercent_(value) {
 
 function attendanceDate_(value) {
   if (!value) return null;
-  const date = value instanceof Date ? value : new Date(value);
+  if (value instanceof Date) return isNaN(value.getTime()) ? null : value;
+  let text = String(value).trim();
+  if (!text) return null;
+  // Fix typos like '202 4' -> '2024' or multiple spaces
+  text = text.replace(/(\b20\d)\s+(\d\b)/, '$1$2').replace(/\s+/g, ' ');
+  // Handle ISO YYYY-MM-DD
+  const isoMatch = text.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+  if (isoMatch) {
+    const y = Number(isoMatch[1]), m = Number(isoMatch[2]), d = Number(isoMatch[3]);
+    const dt = new Date(Date.UTC(y, m - 1, d, 12));
+    if (!isNaN(dt.getTime()) && dt.getUTCFullYear() === y && dt.getUTCMonth() === m - 1 && dt.getUTCDate() === d) {
+      return dt;
+    }
+  }
+  const date = new Date(text);
   return isNaN(date.getTime()) ? null : date;
 }
 
@@ -1421,10 +1440,37 @@ function ensureDefaultGatheringSchedulesLocked_() {
     { id: 'EVT-WORSHIP-SERVICE', name: 'Worship Service' },
     { id: 'EVT-THANKSGIVING', name: 'Thanksgiving' }
   ];
+  const trashSheet = ss.getSheetByName('DELETED_EVENTS');
+  const trashedEventIds = new Set();
+  if (trashSheet && trashSheet.getLastRow() > 1) {
+    const tHeaders = trashSheet.getRange(1, 1, 1, trashSheet.getLastColumn()).getDisplayValues()[0];
+    const tIdCol = attendanceFindColumn_(tHeaders, ['Event ID']);
+    if (tIdCol >= 0) {
+      trashSheet.getRange(2, tIdCol + 1, trashSheet.getLastRow() - 1, 1).getDisplayValues()
+        .forEach(r => { if (r[0]) trashedEventIds.add(String(r[0]).trim()); });
+    }
+  }
+
+  const trashSchedSheet = ss.getSheetByName('DELETED_SCHEDULES');
+  const trashedSchedKeys = new Set();
+  if (trashSchedSheet && trashSchedSheet.getLastRow() > 1) {
+    const tsHeaders = trashSchedSheet.getRange(1, 1, 1, trashSchedSheet.getLastColumn()).getDisplayValues()[0];
+    const tsEventCol = attendanceFindColumn_(tsHeaders, ['Event ID']);
+    const tsDayCol = attendanceFindColumn_(tsHeaders, ['Day of Week', 'Day']);
+    const tsTimeCol = attendanceFindColumn_(tsHeaders, ['Time', 'Start Time']);
+    const tsDisplays = trashSchedSheet.getRange(2, 1, trashSchedSheet.getLastRow() - 1, tsHeaders.length).getDisplayValues();
+    tsDisplays.forEach(row => {
+      const eId = tsEventCol >= 0 ? String(row[tsEventCol] || '').trim().toLowerCase() : '';
+      const day = tsDayCol >= 0 ? String(row[tsDayCol] || '').trim().toLowerCase() : '';
+      const time = tsTimeCol >= 0 ? attendanceScheduleTimeKey_(row[tsTimeCol]) : '';
+      if (eId && day && time) trashedSchedKeys.add([eId, day, time].join('|'));
+    });
+  }
+
   const eventIdByName = Object.create(null);
   eventSeeds.forEach(event => {
     let id = eventMap[event.name.toLowerCase()];
-    if (!id) {
+    if (!id && !trashedEventIds.has(event.id)) {
       id = event.id;
       const row = new Array(eventHeaders.length).fill('');
       row[attendanceFindColumn_(eventHeaders, ['Event ID'])] = id;
@@ -1467,8 +1513,9 @@ function ensureDefaultGatheringSchedulesLocked_() {
   });
   scheduleSeeds.forEach(seed => {
     const eventId = eventIdByName[seed[0]];
+    if (!eventId) return;
     const key = [eventId.toLowerCase(), seed[1].toLowerCase(), attendanceScheduleTimeKey_(seed[2])].join('|');
-    if (existingKeys[key]) return;
+    if (existingKeys[key] || trashedSchedKeys.has(key)) return;
     const row = new Array(scheduleHeaders.length).fill('');
     row[scheduleColumns.id] = `SCH-${Utilities.getUuid().slice(0, 8).toUpperCase()}`;
     row[scheduleColumns.eventId] = eventId;
@@ -1805,6 +1852,332 @@ function restoreDeletedMember(memberId) {
   return { message: 'Member restored.' };
 }
 
+/**
+ * Moves an event and its schedules into DELETED_EVENTS trash sheet.
+ * Records retention date (Deleted At) for 30-day auto-purge.
+ */
+function moveEventToTrash(eventId) {
+  requireAttendanceAccess_();
+  const id = String(eventId || '').trim();
+  if (!id) throw new Error('Event ID is required.');
+
+  const ss = getAttendanceSpreadsheet_();
+  const eventSheet = ss.getSheetByName('EVENTS');
+  if (!eventSheet) throw new Error('EVENTS sheet not found.');
+
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    const eventHeaders = eventSheet.getRange(1, 1, 1, eventSheet.getLastColumn()).getDisplayValues()[0];
+    const eventSchema = attendanceEventSchema_(eventHeaders);
+    const eventValues = eventSheet.getRange(2, 1, Math.max(1, eventSheet.getLastRow() - 1), eventHeaders.length).getValues();
+    const eventDisplays = eventSheet.getRange(2, 1, Math.max(1, eventSheet.getLastRow() - 1), eventHeaders.length).getDisplayValues();
+
+    const rowIndex = eventDisplays.findIndex(row => String(row[eventSchema.id] || '').trim() === id);
+    if (rowIndex < 0) throw new Error('Event was not found.');
+
+    const originalEventRow = eventValues[rowIndex];
+    const eventRowNumber = rowIndex + 2;
+
+    // Archive into DELETED_EVENTS
+    let trash = ss.getSheetByName('DELETED_EVENTS');
+    if (!trash) {
+      trash = ss.insertSheet('DELETED_EVENTS');
+      trash.getRange(1, 1, 1, eventHeaders.length + 3).setValues([eventHeaders.concat(['Deleted At', 'Deleted By', 'Schedules Data'])]);
+      trash.setFrozenRows(1);
+    }
+    const trashHeaders = trash.getRange(1, 1, 1, trash.getLastColumn()).getDisplayValues()[0];
+
+    // Find and bundle all child schedules from EVENT_SCHEDULES
+    const scheduleSheet = ss.getSheetByName('EVENT_SCHEDULES');
+    const childSchedules = [];
+    if (scheduleSheet && scheduleSheet.getLastRow() > 1) {
+      const schHeaders = scheduleSheet.getRange(1, 1, 1, scheduleSheet.getLastColumn()).getDisplayValues()[0];
+      const schSchema = attendanceScheduleSchema_(schHeaders);
+      const schRows = scheduleSheet.getRange(2, 1, scheduleSheet.getLastRow() - 1, schHeaders.length).getValues();
+      for (let s = schRows.length - 1; s >= 0; s--) {
+        if (String(schRows[s][schSchema.eventId] || '').trim() === id) {
+          childSchedules.push(schRows[s]);
+          scheduleSheet.deleteRow(s + 2); // remove schedule from active sheet
+        }
+      }
+    }
+
+    const trashRow = new Array(trashHeaders.length).fill('');
+    eventHeaders.forEach((header, idx) => {
+      const targetIdx = attendanceFindColumn_(trashHeaders, [header]);
+      if (targetIdx >= 0) trashRow[targetIdx] = originalEventRow[idx];
+    });
+
+    const delAtIdx = attendanceFindColumn_(trashHeaders, ['Deleted At']);
+    const delByIdx = attendanceFindColumn_(trashHeaders, ['Deleted By']);
+    const schDataIdx = attendanceFindColumn_(trashHeaders, ['Schedules Data']);
+    if (delAtIdx >= 0) trashRow[delAtIdx] = new Date();
+    if (delByIdx >= 0) trashRow[delByIdx] = Session.getActiveUser().getEmail() || 'Secretary';
+    if (schDataIdx >= 0) trashRow[schDataIdx] = JSON.stringify(childSchedules);
+
+    trash.appendRow(trashRow);
+    eventSheet.deleteRow(eventRowNumber);
+    SpreadsheetApp.flush();
+
+    logAction('TRASH_EVENT', { eventId: id });
+    return { message: 'Event moved to Archive Trash. It will be retained for 30 days before permanent deletion.' };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/**
+ * Lists archived events in trash.
+ */
+function getDeletedEvents() {
+  requireAttendanceAccess_();
+  const table = attendanceOptionalTable_('DELETED_EVENTS');
+  const idCol = attendanceFindColumn_(table.headers, ['Event ID']);
+  const nameCol = attendanceFindColumn_(table.headers, ['Event Name', 'Name', 'Title']);
+  const delAtCol = attendanceFindColumn_(table.headers, ['Deleted At']);
+
+  return table.displays.map((row, index) => ({
+    row: index + 2,
+    eventId: idCol >= 0 ? row[idCol] : '',
+    name: nameCol >= 0 ? row[nameCol] : '',
+    deletedAt: delAtCol >= 0 ? row[delAtCol] : '',
+    values: row
+  })).filter(e => e.eventId);
+}
+
+/**
+ * Restores an archived event from DELETED_EVENTS back to active EVENTS & EVENT_SCHEDULES.
+ */
+function restoreDeletedEvent(eventId) {
+  requireAttendanceAccess_();
+  const id = String(eventId || '').trim();
+  if (!id) throw new Error('Event ID is required.');
+
+  const ss = getAttendanceSpreadsheet_();
+  const trash = ss.getSheetByName('DELETED_EVENTS');
+  if (!trash) throw new Error('The Trash is empty.');
+
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    const trashHeaders = trash.getRange(1, 1, 1, trash.getLastColumn()).getDisplayValues()[0];
+    const idCol = attendanceFindColumn_(trashHeaders, ['Event ID']);
+    const trashRows = trash.getRange(2, 1, Math.max(1, trash.getLastRow() - 1), trashHeaders.length).getValues();
+    const trashDisplays = trash.getRange(2, 1, Math.max(1, trash.getLastRow() - 1), trashHeaders.length).getDisplayValues();
+
+    const rowIndex = trashDisplays.findIndex(row => String(row[idCol] || '').trim() === id);
+    if (rowIndex < 0) throw new Error('Event not found in trash.');
+
+    const trashRowNumber = rowIndex + 2;
+    const trashRow = trashRows[rowIndex];
+
+    const eventSheet = ss.getSheetByName('EVENTS') || ss.insertSheet('EVENTS');
+    const eventHeaders = eventSheet.getRange(1, 1, 1, eventSheet.getLastColumn()).getDisplayValues()[0];
+    const restoredEventRow = new Array(eventHeaders.length).fill('');
+    eventHeaders.forEach((header, idx) => {
+      const srcIdx = attendanceFindColumn_(trashHeaders, [header]);
+      if (srcIdx >= 0) restoredEventRow[idx] = trashRow[srcIdx];
+    });
+    eventSheet.appendRow(restoredEventRow);
+
+    // Restore bundled schedules if present
+    const schDataIdx = attendanceFindColumn_(trashHeaders, ['Schedules Data']);
+    if (schDataIdx >= 0 && trashRow[schDataIdx]) {
+      try {
+        const schRows = JSON.parse(trashRow[schDataIdx]);
+        if (Array.isArray(schRows) && schRows.length) {
+          const scheduleSheet = ss.getSheetByName('EVENT_SCHEDULES') || ss.insertSheet('EVENT_SCHEDULES');
+          schRows.forEach(sRow => scheduleSheet.appendRow(sRow));
+        }
+      } catch (err) {
+        console.warn('Could not parse restored schedules:', err);
+      }
+    }
+
+    trash.deleteRow(trashRowNumber);
+    SpreadsheetApp.flush();
+    logAction('RESTORE_EVENT', { eventId: id });
+    return { message: 'Event and its schedules restored.' };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/**
+ * Moves an individual schedule to DELETED_SCHEDULES trash sheet.
+ * Records retention date (Deleted At) for 30-day auto-purge.
+ */
+function moveScheduleToTrash(scheduleId) {
+  requireAttendanceAccess_();
+  const id = String(scheduleId || '').trim();
+  if (!id) throw new Error('Schedule ID is required.');
+
+  const ss = getAttendanceSpreadsheet_();
+  const schedSheet = ss.getSheetByName('EVENT_SCHEDULES');
+  if (!schedSheet) throw new Error('EVENT_SCHEDULES sheet not found.');
+
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    const headers = schedSheet.getRange(1, 1, 1, schedSheet.getLastColumn()).getDisplayValues()[0];
+    const schema = attendanceScheduleSchema_(headers);
+    const rows = schedSheet.getRange(2, 1, Math.max(1, schedSheet.getLastRow() - 1), headers.length).getValues();
+    const displays = schedSheet.getRange(2, 1, Math.max(1, schedSheet.getLastRow() - 1), headers.length).getDisplayValues();
+
+    const rowIndex = displays.findIndex(row => String(row[schema.scheduleId] || '').trim() === id);
+    if (rowIndex < 0) throw new Error('Schedule was not found.');
+
+    const originalRow = rows[rowIndex];
+    const scheduleRowNumber = rowIndex + 2;
+
+    let trash = ss.getSheetByName('DELETED_SCHEDULES');
+    if (!trash) {
+      trash = ss.insertSheet('DELETED_SCHEDULES');
+      trash.getRange(1, 1, 1, headers.length + 2).setValues([headers.concat(['Deleted At', 'Deleted By'])]);
+      trash.setFrozenRows(1);
+    }
+    const trashHeaders = trash.getRange(1, 1, 1, trash.getLastColumn()).getDisplayValues()[0];
+    const trashRow = new Array(trashHeaders.length).fill('');
+    headers.forEach((header, idx) => {
+      const targetIdx = attendanceFindColumn_(trashHeaders, [header]);
+      if (targetIdx >= 0) trashRow[targetIdx] = originalRow[idx];
+    });
+
+    const delAtIdx = attendanceFindColumn_(trashHeaders, ['Deleted At']);
+    const delByIdx = attendanceFindColumn_(trashHeaders, ['Deleted By']);
+    if (delAtIdx >= 0) trashRow[delAtIdx] = new Date();
+    if (delByIdx >= 0) trashRow[delByIdx] = Session.getActiveUser().getEmail() || 'Secretary';
+
+    trash.appendRow(trashRow);
+    schedSheet.deleteRow(scheduleRowNumber);
+    SpreadsheetApp.flush();
+
+    logAction('TRASH_SCHEDULE', { scheduleId: id });
+    return { success: true, message: 'Schedule moved to Archive Trash (retained 30 days).' };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/**
+ * Lists archived schedules in DELETED_SCHEDULES.
+ */
+function getDeletedSchedules() {
+  requireAttendanceAccess_();
+  const table = attendanceOptionalTable_('DELETED_SCHEDULES');
+  const idCol = attendanceFindColumn_(table.headers, ['Schedule ID']);
+  const nameCol = attendanceFindColumn_(table.headers, ['Schedule Name', 'Name']);
+  const eventIdCol = attendanceFindColumn_(table.headers, ['Event ID']);
+  const dayCol = attendanceFindColumn_(table.headers, ['Day of Week', 'Day']);
+  const timeCol = attendanceFindColumn_(table.headers, ['Time', 'Start Time']);
+  const delAtCol = attendanceFindColumn_(table.headers, ['Deleted At']);
+
+  return table.displays.map((row, index) => ({
+    row: index + 2,
+    scheduleId: idCol >= 0 ? row[idCol] : '',
+    name: nameCol >= 0 ? row[nameCol] : '',
+    eventId: eventIdCol >= 0 ? row[eventIdCol] : '',
+    dayOfWeek: dayCol >= 0 ? row[dayCol] : '',
+    time: timeCol >= 0 ? row[timeCol] : '',
+    deletedAt: delAtCol >= 0 ? row[delAtCol] : ''
+  })).filter(s => s.scheduleId);
+}
+
+/**
+ * Restores an archived schedule from DELETED_SCHEDULES back to EVENT_SCHEDULES.
+ */
+function restoreDeletedSchedule(scheduleId) {
+  requireAttendanceAccess_();
+  const id = String(scheduleId || '').trim();
+  if (!id) throw new Error('Schedule ID is required.');
+
+  const ss = getAttendanceSpreadsheet_();
+  const trash = ss.getSheetByName('DELETED_SCHEDULES');
+  if (!trash) throw new Error('The Schedule Trash is empty.');
+
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    const trashHeaders = trash.getRange(1, 1, 1, trash.getLastColumn()).getDisplayValues()[0];
+    const idCol = attendanceFindColumn_(trashHeaders, ['Schedule ID']);
+    const trashRows = trash.getRange(2, 1, Math.max(1, trash.getLastRow() - 1), trashHeaders.length).getValues();
+    const trashDisplays = trash.getRange(2, 1, Math.max(1, trash.getLastRow() - 1), trashHeaders.length).getDisplayValues();
+
+    const rowIndex = trashDisplays.findIndex(row => String(row[idCol] || '').trim() === id);
+    if (rowIndex < 0) throw new Error('Schedule not found in trash.');
+
+    const trashRowNumber = rowIndex + 2;
+    const trashRow = trashRows[rowIndex];
+
+    const schedSheet = ss.getSheetByName('EVENT_SCHEDULES') || ss.insertSheet('EVENT_SCHEDULES');
+    const schedHeaders = schedSheet.getRange(1, 1, 1, schedSheet.getLastColumn()).getDisplayValues()[0];
+    const restoredRow = new Array(schedHeaders.length).fill('');
+    schedHeaders.forEach((header, idx) => {
+      const srcIdx = attendanceFindColumn_(trashHeaders, [header]);
+      if (srcIdx >= 0) restoredRow[idx] = trashRow[srcIdx];
+    });
+
+    schedSheet.appendRow(restoredRow);
+    trash.deleteRow(trashRowNumber);
+    SpreadsheetApp.flush();
+
+    logAction('RESTORE_SCHEDULE', { scheduleId: id });
+    return { success: true, message: 'Schedule restored successfully.' };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/**
+ * Scans DELETED_MEMBERS, DELETED_EVENTS, DELETED_SCHEDULES, and DELETED_EVENT_HISTORY trash sheets.
+ * Permanently deletes records that have been in trash for more than 30 days.
+ */
+function cleanupExpiredTrash30Days() {
+  requireAttendanceAccess_();
+  const ss = getAttendanceSpreadsheet_();
+  const now = new Date().getTime();
+  const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
+  let purgedCount = 0;
+
+  const purgeSheet = (sheetName) => {
+    const sheet = ss.getSheetByName(sheetName);
+    if (!sheet || sheet.getLastRow() < 2) return;
+    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getDisplayValues()[0];
+    const delAtCol = attendanceFindColumn_(headers, ['Deleted At']);
+    if (delAtCol < 0) return;
+
+    const values = sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).getValues();
+    for (let i = values.length - 1; i >= 0; i--) {
+      const delDate = attendanceDate_(values[i][delAtCol]);
+      if (delDate && (now - delDate.getTime()) > thirtyDaysMs) {
+        sheet.deleteRow(i + 2);
+        purgedCount++;
+      }
+    }
+  };
+
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    purgeSheet('DELETED_MEMBERS');
+    purgeSheet('DELETED_EVENTS');
+    purgeSheet('DELETED_SCHEDULES');
+    purgeSheet('DELETED_EVENT_HISTORY');
+    SpreadsheetApp.flush();
+    logAction('PURGE_EXPIRED_TRASH', { purgedCount: purgedCount });
+
+    if (SpreadsheetApp.getActiveSpreadsheet()) {
+      try {
+        SpreadsheetApp.getUi().alert(`30-Day Trash Purge Complete!\n\n${purgedCount} expired record(s) older than 30 days permanently removed.`);
+      } catch (uiErr) {}
+    }
+    return { success: true, purgedCount: purgedCount };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
 function addAttendanceSchedule(scheduleData) {
   requireAttendanceAccess_();
   const data = scheduleData || {};
@@ -1957,22 +2330,38 @@ function getEventHistory() {
     });
   });
 
+  // Check suppressed occurrence keys from DELETED_EVENT_HISTORY
+  const ss = getAttendanceSpreadsheet_();
+  const trashedOccurrences = new Set();
+  const trashSheet = ss.getSheetByName('DELETED_EVENT_HISTORY');
+  if (trashSheet && trashSheet.getLastRow() > 1) {
+    const tHeaders = trashSheet.getRange(1, 1, 1, trashSheet.getLastColumn()).getDisplayValues()[0];
+    const keyCol = attendanceFindColumn_(tHeaders, ['Occurrence Key']);
+    if (keyCol >= 0) {
+      const tDisplays = trashSheet.getRange(2, keyCol + 1, trashSheet.getLastRow() - 1, 1).getDisplayValues();
+      tDisplays.forEach(row => {
+        if (row[0]) trashedOccurrences.add(String(row[0]).trim());
+      });
+    }
+  }
+
   const today = attendanceDateKey_(new Date());
   const occurrences = Object.create(null);
   const getOccurrence = (eventId, scheduleId, dateKey) => {
-    if (!eventId || !dateKey || dateKey > today || !eventById[eventId]) return null;
-    const event = eventById[eventId];
-    const schedule = scheduleByKey[`${eventId}|${scheduleId}`] || {};
+    if (!eventId || !dateKey || dateKey > today) return null;
     const key = [eventId, scheduleId || '', dateKey].join('|');
+    if (trashedOccurrences.has(key)) return null;
+    const event = eventById[eventId] || { name: eventId, category: 'Event', location: '', description: '', program: '' };
+    const schedule = scheduleByKey[`${eventId}|${scheduleId}`] || {};
     if (!occurrences[key]) {
       occurrences[key] = {
         key: key,
         eventId: eventId,
         scheduleId: scheduleId || '',
-        eventName: event.name,
-        category: event.category,
+        eventName: event.name || eventId,
+        category: event.category || 'Event',
         eventDate: dateKey,
-        scheduleName: schedule.name || event.name,
+        scheduleName: schedule.name || event.name || 'Schedule',
         time: schedule.time || '',
         location: schedule.location || event.location || '',
         mproIncharge: schedule.mproIncharge || '',
@@ -2013,22 +2402,506 @@ function getEventHistoryDetails(eventId, scheduleId, eventDate) {
   requireAttendanceAccess_();
   const dateKey = attendanceInputDateKey_(eventDate);
   const occurrence = getEventHistory().find(item => item.eventId === String(eventId || '') &&
-    String(item.scheduleId) === String(scheduleId || '') && item.eventDate === dateKey);
+    String(item.scheduleId || '') === String(scheduleId || '') && item.eventDate === dateKey);
   if (!occurrence) throw new Error('That event history record was not found. Refresh and select it again.');
-  const records = attendanceGetRecords(dateKey, dateKey).filter(record => record.eventId === occurrence.eventId &&
-    String(record.scheduleId) === String(occurrence.scheduleId));
+  const records = attendanceGetRecords_(dateKey, dateKey).filter(record => record.eventId === occurrence.eventId &&
+    String(record.scheduleId || '') === String(occurrence.scheduleId || ''));
   const members = getAllMembers();
   const memberById = Object.create(null);
   members.forEach(member => { memberById[member.memberId] = member; });
   return {
     event: occurrence,
-    attendees: records.map(record => ({
-      memberId: record.memberId,
-      name: record.memberName || (memberById[record.memberId] && memberById[record.memberId].name) || 'Name not recorded',
-      status: record.status || 'Not recorded',
-      recordedBy: record.recordedBy || '',
-      recordedAt: record.recordedAt || '',
-      member: memberById[record.memberId] || null
-    })).sort((a, b) => a.name.localeCompare(b.name))
+    attendees: records.map(record => {
+      const member = memberById[record.memberId] || null;
+      return {
+        memberId: record.memberId,
+        name: record.memberName || (member && member.name) || 'Name not recorded',
+        status: record.status || 'Not recorded',
+        recordedBy: record.recordedBy || '',
+        recordedAt: record.recordedAt || '',
+        contactNumber: member ? member.contactNumber : '',
+        category: member ? member.category : '',
+        membershipStatus: member ? member.membershipStatus : '',
+        studentStatus: member ? member.studentStatus : '',
+        employmentStatus: member ? member.employmentStatus : '',
+        committees: member ? member.committees : '',
+        member: member
+      };
+    }).sort((a, b) => a.name.localeCompare(b.name))
   };
+}
+
+/**
+ * Deletes / Archives a past event occurrence and its saved attendance records into DELETED_EVENT_HISTORY.
+ * Retains records for 30 days before permanent deletion.
+ * Automatically recalculates member attendance rollups.
+ */
+function deleteEventHistoryOccurrence(eventId, scheduleId, eventDate) {
+  requireAttendanceAccess_();
+  const eId = String(eventId || '').trim();
+  const sId = String(scheduleId || '').trim();
+  const dateKey = attendanceInputDateKey_(eventDate);
+  if (!eId || !dateKey) throw new Error('Event ID and Event Date are required to delete a past event.');
+
+  const ss = getAttendanceSpreadsheet_();
+  const recordSheet = ss.getSheetByName('ATTENDANCE_RECORDS');
+  if (!recordSheet) throw new Error('ATTENDANCE_RECORDS sheet not found.');
+
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    const recHeaders = recordSheet.getRange(1, 1, 1, recordSheet.getLastColumn()).getDisplayValues()[0];
+    const recSchema = attendanceRecordSchema_(recHeaders);
+
+    const occurrences = getEventHistory();
+    const occurrence = occurrences.find(item => item.eventId === eId &&
+      String(item.scheduleId || '') === sId && item.eventDate === dateKey);
+
+    const eventName = occurrence ? occurrence.eventName : eId;
+    const scheduleName = occurrence ? occurrence.scheduleName : sId;
+
+    let trash = ss.getSheetByName('DELETED_EVENT_HISTORY');
+    if (!trash) {
+      trash = ss.insertSheet('DELETED_EVENT_HISTORY');
+      trash.getRange(1, 1, 1, 11).setValues([[
+        'Archive ID', 'Occurrence Key', 'Event ID', 'Schedule ID', 'Event Name',
+        'Event Date', 'Schedule Name', 'Record Count', 'Deleted At', 'Deleted By', 'Attendance Records JSON'
+      ]]);
+      trash.setFrozenRows(1);
+    }
+    const trashHeaders = trash.getRange(1, 1, 1, trash.getLastColumn()).getDisplayValues()[0];
+
+    const occurrenceKey = [eId, sId, dateKey].join('|');
+    const archiveId = 'ARCH-HIST-' + Utilities.formatDate(new Date(), Session.getScriptTimeZone() || 'Asia/Manila', 'yyyyMMdd-HHmmss') + '-' + Math.floor(Math.random() * 1000);
+
+    const matchedRows = [];
+    if (recordSheet.getLastRow() > 1) {
+      const recRows = recordSheet.getRange(2, 1, recordSheet.getLastRow() - 1, recHeaders.length).getValues();
+      for (let i = recRows.length - 1; i >= 0; i--) {
+        const row = recRows[i];
+        const rowEId = String(row[recSchema.eventId] || '').trim();
+        const rowSId = String(row[recSchema.scheduleId] || '').trim();
+        const rowDate = attendanceDateKey_(row[recSchema.eventDate]);
+
+        const matchesEvent = rowEId === eId;
+        const matchesDate = rowDate === dateKey;
+        const matchesSchedule = !sId || !rowSId || rowSId === sId;
+
+        if (matchesEvent && matchesDate && matchesSchedule) {
+          matchedRows.push(row);
+          recordSheet.deleteRow(i + 2);
+        }
+      }
+    }
+
+    const trashRow = new Array(trashHeaders.length).fill('');
+    const colIndex = (name) => attendanceFindColumn_(trashHeaders, [name]);
+    const setCol = (name, val) => {
+      const idx = colIndex(name);
+      if (idx >= 0) trashRow[idx] = val;
+    };
+
+    setCol('Archive ID', archiveId);
+    setCol('Occurrence Key', occurrenceKey);
+    setCol('Event ID', eId);
+    setCol('Schedule ID', sId);
+    setCol('Event Name', eventName);
+    setCol('Event Date', dateKey);
+    setCol('Schedule Name', scheduleName);
+    setCol('Record Count', matchedRows.length);
+    setCol('Deleted At', new Date());
+    setCol('Deleted By', Session.getActiveUser().getEmail() || 'Secretary');
+    setCol('Attendance Records JSON', JSON.stringify(matchedRows));
+
+    trash.appendRow(trashRow);
+    SpreadsheetApp.flush();
+
+    // Recalculate member rollups
+    try {
+      syncMemberAttendanceRollups();
+    } catch (err) {
+      console.warn('Rollup sync error:', err);
+    }
+
+    logAction('TRASH_EVENT_HISTORY', {
+      archiveId: archiveId,
+      eventId: eId,
+      scheduleId: sId,
+      eventDate: dateKey,
+      count: matchedRows.length
+    });
+
+    return {
+      success: true,
+      archiveId: archiveId,
+      count: matchedRows.length,
+      message: `Past event "${eventName}" (${dateKey}) moved to Archive Trash (${matchedRows.length} attendance record(s)). Retained for 30 days.`
+    };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/**
+ * Lists archived past events in DELETED_EVENT_HISTORY.
+ */
+function getDeletedEventHistory() {
+  requireAttendanceAccess_();
+  const table = attendanceOptionalTable_('DELETED_EVENT_HISTORY');
+  const archIdCol = attendanceFindColumn_(table.headers, ['Archive ID']);
+  const keyCol = attendanceFindColumn_(table.headers, ['Occurrence Key']);
+  const eventIdCol = attendanceFindColumn_(table.headers, ['Event ID']);
+  const schedIdCol = attendanceFindColumn_(table.headers, ['Schedule ID']);
+  const nameCol = attendanceFindColumn_(table.headers, ['Event Name']);
+  const dateCol = attendanceFindColumn_(table.headers, ['Event Date']);
+  const schedNameCol = attendanceFindColumn_(table.headers, ['Schedule Name']);
+  const countCol = attendanceFindColumn_(table.headers, ['Record Count']);
+  const delAtCol = attendanceFindColumn_(table.headers, ['Deleted At']);
+  const delByCol = attendanceFindColumn_(table.headers, ['Deleted By']);
+
+  return table.displays.map((row, index) => ({
+    row: index + 2,
+    archiveId: archIdCol >= 0 ? row[archIdCol] : '',
+    occurrenceKey: keyCol >= 0 ? row[keyCol] : '',
+    eventId: eventIdCol >= 0 ? row[eventIdCol] : '',
+    scheduleId: schedIdCol >= 0 ? row[schedIdCol] : '',
+    eventName: nameCol >= 0 ? row[nameCol] : '',
+    eventDate: dateCol >= 0 ? row[dateCol] : '',
+    scheduleName: schedNameCol >= 0 ? row[schedNameCol] : '',
+    recordCount: countCol >= 0 ? Number(row[countCol]) || 0 : 0,
+    deletedAt: delAtCol >= 0 ? row[delAtCol] : '',
+    deletedBy: delByCol >= 0 ? row[delByCol] : ''
+  })).filter(e => e.archiveId || e.eventId);
+}
+
+/**
+ * Restores an archived past event from DELETED_EVENT_HISTORY back to ATTENDANCE_RECORDS.
+ */
+function restoreDeletedEventHistory(archiveId) {
+  requireAttendanceAccess_();
+  const archId = String(archiveId || '').trim();
+  if (!archId) throw new Error('Archive ID is required.');
+
+  const ss = getAttendanceSpreadsheet_();
+  const trash = ss.getSheetByName('DELETED_EVENT_HISTORY');
+  if (!trash) throw new Error('Event history trash is empty.');
+
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    const trashHeaders = trash.getRange(1, 1, 1, trash.getLastColumn()).getDisplayValues()[0];
+    const archIdCol = attendanceFindColumn_(trashHeaders, ['Archive ID']);
+    const jsonCol = attendanceFindColumn_(trashHeaders, ['Attendance Records JSON']);
+    const nameCol = attendanceFindColumn_(trashHeaders, ['Event Name']);
+    const dateCol = attendanceFindColumn_(trashHeaders, ['Event Date']);
+
+    const trashRows = trash.getRange(2, 1, Math.max(1, trash.getLastRow() - 1), trashHeaders.length).getValues();
+    const trashDisplays = trash.getRange(2, 1, Math.max(1, trash.getLastRow() - 1), trashHeaders.length).getDisplayValues();
+
+    const rowIndex = trashDisplays.findIndex(row => String(row[archIdCol] || '').trim() === archId);
+    if (rowIndex < 0) throw new Error('Archived event history record not found.');
+
+    const trashRowNumber = rowIndex + 2;
+    const trashRow = trashRows[rowIndex];
+    const eventName = nameCol >= 0 ? trashRow[nameCol] : 'Event';
+    const eventDate = dateCol >= 0 ? trashRow[dateCol] : '';
+
+    if (jsonCol >= 0 && trashRow[jsonCol]) {
+      try {
+        const rowsToRestore = JSON.parse(trashRow[jsonCol]);
+        if (Array.isArray(rowsToRestore) && rowsToRestore.length > 0) {
+          const recSheet = ss.getSheetByName('ATTENDANCE_RECORDS') || ss.insertSheet('ATTENDANCE_RECORDS');
+          rowsToRestore.forEach(r => recSheet.appendRow(r));
+        }
+      } catch (jsonErr) {
+        console.warn('Could not parse restored attendance records:', jsonErr);
+      }
+    }
+
+    trash.deleteRow(trashRowNumber);
+    SpreadsheetApp.flush();
+
+    try {
+      syncMemberAttendanceRollups();
+    } catch (err) {
+      console.warn('Rollup sync error:', err);
+    }
+
+    logAction('RESTORE_EVENT_HISTORY', { archiveId: archId, eventName: eventName, eventDate: eventDate });
+    return {
+      success: true,
+      message: `Past event "${eventName}" (${eventDate}) and its attendance records restored successfully.`
+    };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/**
+ * ============================================================================
+ * DATA ENGINEERING: HYGIENE, NORMALIZATION, VALIDATION & REPAIR ALGORITHMS
+ * ============================================================================
+ */
+
+function sanitizePhoneNumber_(val) {
+  if (!val) return '';
+  const digits = String(val).replace(/\D/g, '');
+  if (digits.startsWith('639') && digits.length === 12) return '+639' + digits.slice(3);
+  if (digits.startsWith('09') && digits.length === 11) return '+639' + digits.slice(2);
+  if (digits.startsWith('9') && digits.length === 10) return '+639' + digits.slice(1);
+  return String(val).trim();
+}
+
+/**
+ * Cleans corrupted dates, formats phone numbers, normalizes enums,
+ * and fixes missing values in MEMBERS sheet in-place with pre-flight backup.
+ */
+function cleanAndNormalizeMembersData() {
+  requireAttendanceAccess_();
+  const ss = getAttendanceSpreadsheet_();
+  const memberSheet = ss.getSheetByName('MEMBERS');
+  if (!memberSheet) throw new Error('MEMBERS sheet was not found.');
+
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    const lastRow = memberSheet.getLastRow();
+    const lastCol = memberSheet.getLastColumn();
+    if (lastRow < 2) throw new Error('No member rows found to clean.');
+
+    // Step 1: Pre-flight snapshot backup
+    const backupName = `MEMBERS_BACKUP_${Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyyMMdd_HHmmss')}`;
+    let backupSheet = ss.getSheetByName(backupName);
+    if (!backupSheet) {
+      backupSheet = memberSheet.copyTo(ss).setName(backupName);
+    }
+
+    const headers = memberSheet.getRange(1, 1, 1, lastCol).getDisplayValues()[0];
+    const schema = attendanceSchema_(headers);
+    const range = memberSheet.getRange(2, 1, lastRow - 1, lastCol);
+    const values = range.getValues();
+    const displays = range.getDisplayValues();
+
+    let cleanedRows = 0;
+    const studentStatusEnum = ['GRADUATED', '1ST YEAR', '2ND YEAR', '3RD YEAR', '4TH YEAR', 'NOT YET', 'NONE', 'STUDENT'];
+    const employmentEnum = ['EMPLOYED', 'STUDENT', 'SELF EMPLOYED', 'UNEMPLOYED WITH FINANCIAL RESOURCES', 'UNEMPLOYED'];
+
+    for (let i = 0; i < values.length; i++) {
+      const row = values[i];
+      const disp = displays[i];
+
+      // Clean Member ID: pad/standardize M-XXXX
+      if (schema.memberId >= 0 && disp[schema.memberId]) {
+        let id = String(disp[schema.memberId]).trim().toUpperCase();
+        const idMatch = id.match(/^M-?(\d+)$/i);
+        if (idMatch) {
+          const num = idMatch[1].padStart(4, '0');
+          row[schema.memberId] = `M-${num}`;
+        }
+      }
+
+      // Clean Contact Number
+      if (schema.contactNumber >= 0 && disp[schema.contactNumber]) {
+        row[schema.contactNumber] = sanitizePhoneNumber_(disp[schema.contactNumber]);
+      }
+
+      // Clean Birthday
+      if (schema.birthday >= 0 && disp[schema.birthday]) {
+        const parsed = attendanceDate_(disp[schema.birthday]);
+        if (parsed) row[schema.birthday] = parsed;
+      }
+
+      // Clean Sabbath Date
+      if (schema.sabbathDate >= 0 && disp[schema.sabbathDate]) {
+        const parsed = attendanceDate_(disp[schema.sabbathDate]);
+        if (parsed) row[schema.sabbathDate] = parsed;
+      }
+
+      // Membership Status normalization
+      if (schema.membershipStatus >= 0) {
+        const raw = String(disp[schema.membershipStatus] || '').trim().toLowerCase();
+        if (/active\s*locale/i.test(raw)) row[schema.membershipStatus] = 'Active Locale';
+        else if (/inactive/i.test(raw)) row[schema.membershipStatus] = 'Inactive';
+        else if (/on\s*(&|and)\s*off/i.test(raw)) row[schema.membershipStatus] = 'On & Off';
+        else if (/active/i.test(raw)) row[schema.membershipStatus] = 'Active';
+        else if (!raw) row[schema.membershipStatus] = 'Active';
+      }
+
+      // Category normalization
+      if (schema.category >= 0) {
+        const raw = String(disp[schema.category] || '').trim().toLowerCase();
+        if (/junior/i.test(raw)) row[schema.category] = 'Junior';
+        else if (/senior/i.test(raw)) row[schema.category] = 'Senior';
+        else if (!raw) row[schema.category] = 'Junior';
+      }
+
+      // Registered Voter Y/N normalization
+      if (schema.registeredVoter >= 0) {
+        const raw = String(disp[schema.registeredVoter] || '').trim().toUpperCase();
+        row[schema.registeredVoter] = (/^(Y|YES|TRUE|1)$/i.test(raw)) ? 'Y' : (/^(N|NO|FALSE|0)$/i.test(raw)) ? 'N' : (raw || 'N');
+      }
+
+      // Working Student Y/N normalization
+      if (schema.workingStudent >= 0) {
+        const raw = String(disp[schema.workingStudent] || '').trim().toUpperCase();
+        row[schema.workingStudent] = (/^(Y|YES|TRUE|1)$/i.test(raw)) ? 'Y' : (/^(N|NO|FALSE|0)$/i.test(raw)) ? 'N' : (raw || 'N');
+      }
+
+      // Out of School Youth Y/N normalization
+      if (schema.outOfSchoolYouth >= 0) {
+        const raw = String(disp[schema.outOfSchoolYouth] || '').trim().toUpperCase();
+        row[schema.outOfSchoolYouth] = (/^(Y|YES|TRUE|1)$/i.test(raw)) ? 'Y' : (/^(N|NO|FALSE|0)$/i.test(raw)) ? 'N' : (raw || 'N');
+      }
+
+      // Parent Baptism Status normalization
+      if (schema.parentBaptismStatus >= 0) {
+        const raw = String(disp[schema.parentBaptismStatus] || '').trim().toLowerCase();
+        if (/both/i.test(raw)) row[schema.parentBaptismStatus] = 'Both Mother & Father';
+        else if (/mother/i.test(raw)) row[schema.parentBaptismStatus] = 'Mother Only';
+        else if (/father/i.test(raw)) row[schema.parentBaptismStatus] = 'Father Only';
+        else if (/unbaptized/i.test(raw)) row[schema.parentBaptismStatus] = 'Unbaptized Parent/s';
+      }
+
+      cleanedRows++;
+    }
+
+    range.setValues(values);
+    SpreadsheetApp.flush();
+    logAction('CLEAN_MEMBERS_DATA', { rowsCleaned: cleanedRows, backupCreated: backupName });
+
+    if (SpreadsheetApp.getActiveSpreadsheet()) {
+      SpreadsheetApp.getUi().alert(`Data Hygiene Complete!\n\n• Cleaned ${cleanedRows} member rows.\n• Snapshot backup created: ${backupName}`);
+    }
+    return { success: true, count: cleanedRows, backup: backupName };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/**
+ * Sets up strict Google Sheets Data Validation rules and dropdowns on the MEMBERS tab.
+ */
+function setupSheetValidations() {
+  requireAttendanceAccess_();
+  const ss = getAttendanceSpreadsheet_();
+  const sheet = ss.getSheetByName('MEMBERS');
+  if (!sheet) throw new Error('MEMBERS sheet was not found.');
+
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getDisplayValues()[0];
+  const schema = attendanceSchema_(headers);
+  const maxRows = Math.max(100, sheet.getMaxRows());
+
+  const addValidation = (colIdx, allowedValues) => {
+    if (colIdx < 0) return;
+    const rule = SpreadsheetApp.newDataValidation()
+      .requireValueInList(allowedValues, true)
+      .setAllowInvalid(false)
+      .setHelpText(`Select from: ${allowedValues.join(', ')}`)
+      .build();
+    sheet.getRange(2, colIdx + 1, maxRows - 1, 1).setDataValidation(rule);
+  };
+
+  addValidation(schema.membershipStatus, ['Active', 'Inactive', 'Active Locale', 'On & Off']);
+  addValidation(schema.category, ['Junior', 'Senior']);
+  addValidation(schema.studentStatus, ['GRADUATED', '1ST YEAR', '2ND YEAR', '3RD YEAR', '4TH YEAR', 'NOT YET', 'NONE', 'Student']);
+  addValidation(schema.employmentStatus, ['EMPLOYED', 'STUDENT', 'SELF EMPLOYED', 'UNEMPLOYED WITH FINANCIAL RESOURCES', 'UNEMPLOYED']);
+  addValidation(schema.registeredVoter, ['Y', 'N']);
+  addValidation(schema.workingStudent, ['Y', 'N']);
+  addValidation(schema.outOfSchoolYouth, ['Y', 'N']);
+  addValidation(schema.gender, ['Male', 'Female']);
+  addValidation(schema.parentBaptismStatus, ['Both Mother & Father', 'Mother Only', 'Father Only', 'Unbaptized Parent/s']);
+
+  logAction('SETUP_SHEET_VALIDATIONS', { columnsConfigured: 9 });
+  if (SpreadsheetApp.getActiveSpreadsheet()) {
+    SpreadsheetApp.getUi().alert('Data Validation Rules Applied!\n\nDropdowns and integrity checks configured for MEMBERS sheet.');
+  }
+  return { success: true };
+}
+
+/**
+ * Fast O(N+M) Map-based rollup algorithm that recalculates:
+ * - Attendance Count
+ * - Attendance Percentage
+ * - Last Attendance Date
+ * - Activity Status
+ * directly into the MEMBERS sheet from ATTENDANCE_RECORDS.
+ */
+function syncMemberAttendanceRollups() {
+  requireAttendanceAccess_();
+  const ss = getAttendanceSpreadsheet_();
+  const memberSheet = ss.getSheetByName('MEMBERS');
+  const recordSheet = ss.getSheetByName('ATTENDANCE_RECORDS');
+  if (!memberSheet || !recordSheet) throw new Error('MEMBERS or ATTENDANCE_RECORDS sheet missing.');
+
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    const memberHeaders = memberSheet.getRange(1, 1, 1, memberSheet.getLastColumn()).getDisplayValues()[0];
+    const memberSchema = attendanceSchema_(memberHeaders);
+    const memberLastRow = memberSheet.getLastRow();
+    if (memberLastRow < 2) return { success: true, count: 0 };
+
+    const memberRange = memberSheet.getRange(2, 1, memberLastRow - 1, memberSheet.getLastColumn());
+    const memberValues = memberRange.getValues();
+    const memberDisplays = memberRange.getDisplayValues();
+
+    const records = attendanceGetRecords_();
+    const eventOccurrences = new Set();
+    const statsMap = new Map();
+
+    records.forEach(rec => {
+      const key = attendanceEventKey_(rec);
+      if (key) eventOccurrences.add(key);
+      const mId = String(rec.memberId || '').trim();
+      if (!mId) return;
+
+      if (!statsMap.has(mId)) {
+        statsMap.set(mId, { count: 0, lastDate: '', seenEvents: new Set() });
+      }
+      const st = statsMap.get(mId);
+      if (attendanceIsPresent_(rec.status) && !st.seenEvents.has(key)) {
+        st.seenEvents.add(key);
+        st.count++;
+        if (!st.lastDate || rec.eventDate > st.lastDate) {
+          st.lastDate = rec.eventDate;
+        }
+      }
+    });
+
+    const totalEvents = eventOccurrences.size || 1;
+
+    for (let i = 0; i < memberValues.length; i++) {
+      const mId = String(memberDisplays[i][memberSchema.memberId] || '').trim();
+      if (!mId) continue;
+
+      const st = statsMap.get(mId) || { count: 0, lastDate: '' };
+      const pct = eventOccurrences.size > 0 ? (st.count / totalEvents) : null;
+
+      if (memberSchema.attendanceCount >= 0) {
+        memberValues[i][memberSchema.attendanceCount] = st.count;
+      }
+      if (memberSchema.attendancePercentage >= 0) {
+        memberValues[i][memberSchema.attendancePercentage] = pct;
+      }
+      if (memberSchema.lastAttendanceDate >= 0 && st.lastDate) {
+        memberValues[i][memberSchema.lastAttendanceDate] = st.lastDate;
+      }
+      if (memberSchema.activityStatus >= 0) {
+        memberValues[i][memberSchema.activityStatus] = pct === null ? 'No data' : pct >= 0.75 ? 'Regular' : pct >= 0.5 ? 'Active' : 'At Risk';
+      }
+    }
+
+    memberRange.setValues(memberValues);
+    SpreadsheetApp.flush();
+    logAction('SYNC_MEMBER_ROLLUPS', { membersUpdated: memberValues.length, totalEvents: eventOccurrences.size });
+
+    if (SpreadsheetApp.getActiveSpreadsheet()) {
+      try {
+        SpreadsheetApp.getUi().alert(`Rollups Synchronized!\n\nRecalculated metrics for ${memberValues.length} members based on ${eventOccurrences.size} events.`);
+      } catch (uiErr) {}
+    }
+    return { success: true, count: memberValues.length, totalEvents: eventOccurrences.size };
+  } finally {
+    lock.releaseLock();
+  }
 }

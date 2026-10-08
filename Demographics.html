@@ -197,3 +197,67 @@
     </div>
   </div>
 </section>
+
+<script>
+  async function loadDemographicsPage() {
+    if (state.page !== 'Demographics') return;
+    try {
+      const members = await apiCall('getAllMembers');
+      renderDynamicDemographics(members);
+      state.loadedPages['Demographics'] = true;
+    } catch (err) {
+      console.warn('Demographics dynamic load error:', err);
+    }
+  }
+
+  function renderDynamicDemographics(members) {
+    if (!Array.isArray(members) || !members.length) return;
+    const total = members.length;
+    const liveBadge = document.querySelector('#demographics-page .mini-badge');
+    if (liveBadge) liveBadge.textContent = `Live Database (${total} Members)`;
+
+    let juniors = 0, seniors = 0;
+    let students = 0, workingStudents = 0, osy = 0, employed = 0;
+    let voters = 0;
+    let bothParents = 0, motherOnly = 0, fatherOnly = 0, unbaptized = 0;
+
+    members.forEach(m => {
+      const age = Number(m.age);
+      const isJunior = (!isNaN(age) && age > 0) ? age < 18 : /junior/i.test(m.category || '');
+      if (isJunior) juniors++; else seniors++;
+
+      const isStudent = /student/i.test(m.studentStatus || '') || /student/i.test(m.employmentStatus || '');
+      if (isStudent) students++;
+
+      if (String(m.workingStudent || '').toUpperCase().startsWith('Y') || /true/i.test(String(m.workingStudent || ''))) workingStudents++;
+      if (String(m.outOfSchoolYouth || '').toUpperCase().startsWith('Y') || /true/i.test(String(m.outOfSchoolYouth || ''))) osy++;
+      if (/employed/i.test(m.employmentStatus || '')) employed++;
+      if (String(m.registeredVoter || '').toUpperCase().startsWith('Y') || /true/i.test(String(m.registeredVoter || ''))) voters++;
+
+      const pStatus = String(m.parentBaptismStatus || '').toLowerCase();
+      if (/both/i.test(pStatus)) bothParents++;
+      else if (/mother/i.test(pStatus)) motherOnly++;
+      else if (/father/i.test(pStatus)) fatherOnly++;
+      else if (/unbaptized/i.test(pStatus)) unbaptized++;
+    });
+
+    const updateCard = (cardIndex, vals) => {
+      const cards = document.querySelectorAll('#demographics-page .demographic-card');
+      if (!cards[cardIndex]) return;
+      const statMinis = cards[cardIndex].querySelectorAll('.stat-mini');
+      vals.forEach((v, i) => {
+        if (!statMinis[i]) return;
+        const strong = statMinis[i].querySelector('strong');
+        const pct = statMinis[i].querySelector('.percent');
+        if (strong) strong.textContent = v.count;
+        if (pct) pct.textContent = total ? `${((v.count / total) * 100).toFixed(1)}%` : '0%';
+      });
+    };
+
+    updateCard(0, [{ count: juniors }, { count: seniors }]);
+    updateCard(1, [{ count: students }, { count: workingStudents }, { count: osy }]);
+    updateCard(2, [{ count: employed }, { count: Math.max(0, total - employed) }]);
+    updateCard(3, [{ count: voters }, { count: Math.max(0, total - voters) }]);
+    updateCard(4, [{ count: bothParents }, { count: motherOnly }, { count: fatherOnly }, { count: unbaptized }]);
+  }
+</script>
