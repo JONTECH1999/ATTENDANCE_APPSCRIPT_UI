@@ -1,0 +1,767 @@
+<section id="cleaners-page" class="module-view" hidden>
+<style>
+/* ═══════════════════════════════════════════════════
+   CLEANERS ASSIGNMENT — scoped styles
+════════════════════════════════════════════════════ */
+#cleaners-page { --cl-hot:  #7c3aed; --cl-high: #059669; --cl-rec: #2563eb; --cl-warn: #d97706; --cl-none: #6b7787; }
+
+/* ── page shell ── */
+#cleaners-page .cl-shell {
+  display: grid;
+  grid-template-columns: minmax(0,1fr) 320px;
+  gap: 18px;
+  align-items: start;
+  padding: 20px 24px 48px;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+@media (max-width: 1100px) { #cleaners-page .cl-shell { grid-template-columns: 1fr; } }
+@media (max-width: 700px)  { #cleaners-page .cl-shell { padding: 12px 11px 36px; gap: 12px; } }
+
+/* ── panel ── */
+#cleaners-page .cl-panel {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+#cleaners-page .cl-panel-head {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  gap: 12px; padding: 16px 18px 12px;
+  border-bottom: 1px solid var(--line);
+}
+#cleaners-page .cl-panel-head h3 { margin: 0; font: 750 13px "Manrope",sans-serif; }
+#cleaners-page .cl-panel-head p  { margin: 3px 0 0; color: var(--muted); font-size: 10px; }
+#cleaners-page .cl-panel-body    { padding: 14px 18px; }
+
+/* ── event form ── */
+#cleaners-page .cl-event-form { display: grid; gap: 10px; }
+#cleaners-page .cl-field      { display: grid; gap: 4px; }
+#cleaners-page .cl-label      { font-size: 10px; font-weight: 700; color: var(--muted); letter-spacing:.04em; text-transform: uppercase; }
+#cleaners-page .cl-input, #cleaners-page .cl-select {
+  width: 100%; min-height: 36px; padding: 0 10px;
+  color: var(--ink); background: var(--canvas);
+  border: 1px solid var(--line); border-radius: 6px;
+  font: inherit; font-size: 12px; outline: 0;
+}
+#cleaners-page .cl-input:focus, #cleaners-page .cl-select:focus { border-color: #9bb5f7; box-shadow: 0 0 0 3px #2563eb18; }
+#cleaners-page .cl-row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+@media (max-width: 480px) { #cleaners-page .cl-row2 { grid-template-columns: 1fr; } }
+
+/* ── slot counter ── */
+#cleaners-page .cl-slot-bar {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 8px; padding: 8px 12px;
+  background: var(--canvas); border-radius: 6px;
+  border: 1px solid var(--line);
+  font-size: 11px;
+}
+#cleaners-page .cl-slot-fill  { font: 700 13px "Manrope",sans-serif; }
+#cleaners-page .cl-slot-fill.full   { color: var(--cl-high); }
+#cleaners-page .cl-slot-fill.over   { color: var(--danger); }
+#cleaners-page .cl-slot-fill.under  { color: var(--cl-warn); }
+#cleaners-page .cl-progress { flex: 1; height: 6px; background: var(--line); border-radius: 99px; overflow: hidden; }
+#cleaners-page .cl-progress-bar { height: 100%; border-radius: 99px; background: var(--cl-rec); transition: width .25s; }
+#cleaners-page .cl-progress-bar.full { background: var(--cl-high); }
+#cleaners-page .cl-progress-bar.over { background: var(--danger); }
+
+/* ── member picker ── */
+#cleaners-page .cl-search-wrap { position: relative; margin-bottom: 10px; }
+#cleaners-page .cl-search-icon { position: absolute; top: 9px; left: 10px; color: var(--muted); font-size: 16px; pointer-events: none; }
+#cleaners-page .cl-search { width: 100%; min-height: 36px; padding: 0 10px 0 34px; font: inherit; font-size: 12px; color: var(--ink); background: var(--canvas); border: 1px solid var(--line); border-radius: 6px; outline: 0; }
+#cleaners-page .cl-search:focus { border-color: #9bb5f7; box-shadow: 0 0 0 3px #2563eb18; }
+#cleaners-page .cl-sort-row { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; flex-wrap: wrap; }
+#cleaners-page .cl-sort-btn {
+  padding: 3px 8px; border: 1px solid var(--line); border-radius: 99px;
+  font-size: 9px; font-weight: 700; color: var(--muted);
+  background: var(--surface); cursor: pointer;
+  transition: all .12s;
+}
+#cleaners-page .cl-sort-btn.active { background: var(--primary); border-color: var(--primary); color: white; }
+
+/* ── member list ── */
+#cleaners-page .cl-member-list { max-height: 54dvh; overflow-y: auto; border: 1px solid var(--line); border-radius: 8px; }
+#cleaners-page .cl-member-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 12px; border-bottom: 1px solid var(--line);
+  cursor: pointer; transition: background .1s;
+  user-select: none;
+}
+#cleaners-page .cl-member-item:last-child { border-bottom: none; }
+#cleaners-page .cl-member-item:hover  { background: var(--canvas); }
+#cleaners-page .cl-member-item.selected { background: #eaf0ff; }
+#cleaners-page .cl-member-item.selected:hover { background: #dde8ff; }
+
+#cleaners-page .cl-check { width: 18px; height: 18px; flex-shrink: 0; border: 2px solid var(--line); border-radius: 4px; display: grid; place-items: center; background: var(--surface); transition: all .1s; }
+#cleaners-page .cl-member-item.selected .cl-check { background: var(--primary); border-color: var(--primary); }
+#cleaners-page .cl-check-tick { color: white; font-size: 13px; opacity: 0; }
+#cleaners-page .cl-member-item.selected .cl-check-tick { opacity: 1; }
+
+#cleaners-page .cl-member-avatar {
+  width: 32px; height: 32px; flex-shrink: 0;
+  border-radius: 50%; display: grid; place-items: center;
+  font: 700 11px "Manrope",sans-serif;
+  background: color-mix(in srgb, var(--primary) 14%, var(--canvas));
+  color: var(--primary);
+  border: 1px solid color-mix(in srgb, var(--primary) 22%, transparent);
+}
+#cleaners-page .cl-member-body { flex: 1; min-width: 0; }
+#cleaners-page .cl-member-name { font: 650 11px "DM Sans",sans-serif; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#cleaners-page .cl-member-id   { font-size: 9px; color: var(--primary); font-weight: 700; }
+#cleaners-page .cl-member-meta { display: flex; align-items: center; gap: 5px; margin-top: 2px; flex-wrap: wrap; }
+
+/* ── recommendation badges ── */
+#cleaners-page .cl-rec-badge {
+  display: inline-flex; align-items: center; gap: 3px;
+  padding: 2px 6px; border-radius: 99px;
+  font-size: 8.5px; font-weight: 750; white-space: nowrap;
+}
+#cleaners-page .cl-rec-hot  { background: #f3e8ff; color: var(--cl-hot); }   /* never assigned */
+#cleaners-page .cl-rec-high { background: #d1fae5; color: var(--cl-high); }  /* 60+ days */
+#cleaners-page .cl-rec-rec  { background: #dbeafe; color: var(--cl-rec); }   /* 30-59 days */
+#cleaners-page .cl-rec-warn { background: #fef3c7; color: var(--cl-warn); }  /* 14-29 days */
+#cleaners-page .cl-rec-none { background: var(--canvas); color: var(--cl-none); border: 1px solid var(--line); } /* <14 days */
+
+#cleaners-page .cl-days-ago { font-size: 9px; color: var(--muted); }
+
+/* ── selected roster on right panel ── */
+#cleaners-page .cl-roster-list { display: grid; gap: 5px; min-height: 60px; }
+#cleaners-page .cl-roster-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 7px 10px; background: var(--canvas);
+  border: 1px solid var(--line); border-radius: 6px;
+}
+#cleaners-page .cl-roster-num  { width: 20px; height: 20px; border-radius: 50%; background: var(--primary); color: white; font: 750 9px "Manrope",sans-serif; display: grid; place-items: center; flex-shrink: 0; }
+#cleaners-page .cl-roster-name { flex: 1; font-size: 11px; font-weight: 650; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#cleaners-page .cl-roster-id   { font-size: 9px; color: var(--primary); }
+#cleaners-page .cl-roster-rm   { display: grid; place-items: center; width: 22px; height: 22px; border: 0; background: transparent; color: var(--muted); cursor: pointer; border-radius: 4px; flex-shrink: 0; }
+#cleaners-page .cl-roster-rm:hover { background: #fee2e2; color: var(--danger); }
+#cleaners-page .cl-roster-empty { padding: 20px; text-align: center; color: var(--muted); font-size: 10px; }
+
+/* ── actions ── */
+#cleaners-page .cl-actions { display: flex; gap: 8px; flex-wrap: wrap; padding-top: 12px; border-top: 1px solid var(--line); margin-top: 2px; }
+#cleaners-page .cl-btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 36px; padding: 0 14px; border-radius: 6px; font: 700 11px "DM Sans",sans-serif; border: 1px solid var(--line); cursor: pointer; transition: all .12s; white-space: nowrap; }
+#cleaners-page .cl-btn-primary { background: var(--primary); border-color: var(--primary); color: white; }
+#cleaners-page .cl-btn-primary:hover { background: #1d4ed8; }
+#cleaners-page .cl-btn-danger  { color: var(--danger); }
+#cleaners-page .cl-btn-danger:hover  { background: #fef2f2; border-color: var(--danger); }
+#cleaners-page .cl-btn .material-symbols-rounded { font-size: 16px; }
+
+/* ── history table ── */
+#cleaners-page .cl-history-wrap { overflow-x: auto; }
+#cleaners-page .cl-history-table { width: 100%; border-collapse: collapse; font-size: 10px; }
+#cleaners-page .cl-history-table th { padding: 8px 10px; background: var(--canvas); color: var(--muted); font-size: 9px; font-weight: 750; text-transform: uppercase; letter-spacing: .04em; border-bottom: 1px solid var(--line); white-space: nowrap; text-align: left; }
+#cleaners-page .cl-history-table td { padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+#cleaners-page .cl-history-table tr:last-child td { border-bottom: none; }
+#cleaners-page .cl-history-table tr:hover td { background: var(--canvas); }
+#cleaners-page .cl-history-date { font-weight: 700; white-space: nowrap; color: var(--ink); }
+#cleaners-page .cl-history-label { font-size: 9px; color: var(--muted); }
+#cleaners-page .cl-history-names { line-height: 1.7; }
+#cleaners-page .cl-history-badge { display: inline-block; padding: 1px 6px; border-radius: 99px; background: var(--primary-soft); color: var(--primary); font-size: 9px; font-weight: 700; margin: 1px 2px; }
+
+/* ── empty ── */
+#cleaners-page .cl-empty { padding: 28px; text-align: center; color: var(--muted); font-size: 11px; }
+#cleaners-page .cl-empty .material-symbols-rounded { font-size: 32px; display: block; margin: 0 auto 8px; opacity: .35; }
+</style>
+
+  <div class="module-titlebar">
+    <div>
+      <p class="eyebrow">Ministry Operations</p>
+      <h2>Cleaners Assignment</h2>
+      <p id="cleaners-page-caption" class="module-caption">Loading cleaner records…</p>
+    </div>
+  </div>
+
+  <div class="cl-shell">
+    <!-- ── LEFT: Picker + Member List ── -->
+    <div style="display:grid;gap:16px;">
+
+      <!-- Event Setup -->
+      <div class="cl-panel">
+        <div class="cl-panel-head">
+          <div>
+            <h3><span class="material-symbols-rounded" style="font-size:15px;vertical-align:-3px;margin-right:4px;">event</span>Event Details</h3>
+            <p>Set the Thanksgiving date and label before selecting cleaners.</p>
+          </div>
+        </div>
+        <div class="cl-panel-body">
+          <div class="cl-event-form">
+            <div class="cl-row2">
+              <div class="cl-field">
+                <label class="cl-label" for="cl-event-date">Event Date</label>
+                <input class="cl-input" id="cl-event-date" type="date">
+              </div>
+              <div class="cl-field">
+                <label class="cl-label" for="cl-event-label">Event Label</label>
+                <input class="cl-input" id="cl-event-label" type="text" placeholder="e.g. Thanksgiving, SPBB Day 1" value="Thanksgiving">
+              </div>
+            </div>
+            <div class="cl-field">
+              <label class="cl-label" for="cl-target-count">Target Cleaners</label>
+              <select class="cl-select" id="cl-target-count">
+                <option value="6">6 cleaners</option>
+                <option value="7">7 cleaners</option>
+                <option value="8">8 cleaners</option>
+                <option value="9" selected>9 cleaners (recommended)</option>
+                <option value="10">10 cleaners</option>
+                <option value="12">12 cleaners</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Member Picker -->
+      <div class="cl-panel">
+        <div class="cl-panel-head">
+          <div>
+            <h3><span class="material-symbols-rounded" style="font-size:15px;vertical-align:-3px;margin-right:4px;">manage_accounts</span>Select Cleaners</h3>
+            <p>Active members ranked by priority — longest unassigned first.</p>
+          </div>
+          <div id="cl-slot-bar" class="cl-slot-bar" style="align-self:flex-start;min-width:140px;">
+            <span class="cl-slot-fill under" id="cl-slot-fill">0 / 9</span>
+            <div class="cl-progress"><div class="cl-progress-bar" id="cl-progress-bar" style="width:0%"></div></div>
+          </div>
+        </div>
+        <div class="cl-panel-body">
+          <!-- Search + Sort -->
+          <div class="cl-search-wrap">
+            <span class="material-symbols-rounded cl-search-icon">search</span>
+            <input class="cl-search" id="cl-member-search" type="search" placeholder="Search name or Member ID…">
+          </div>
+          <div class="cl-sort-row">
+            <span style="font-size:9px;color:var(--muted);font-weight:700;">SORT:</span>
+            <button class="cl-sort-btn active" data-sort="priority" type="button">⬆ Priority</button>
+            <button class="cl-sort-btn" data-sort="name" type="button">A–Z Name</button>
+            <button class="cl-sort-btn" data-sort="id" type="button">Member ID</button>
+          </div>
+          <div class="cl-member-list" id="cl-member-list">
+            <div class="cl-empty"><span class="material-symbols-rounded">hourglass_empty</span>Loading members…</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── RIGHT: Selected Roster + History ── -->
+    <div style="display:grid;gap:16px;">
+
+      <!-- Roster -->
+      <div class="cl-panel">
+        <div class="cl-panel-head">
+          <div>
+            <h3><span class="material-symbols-rounded" style="font-size:15px;vertical-align:-3px;margin-right:4px;">checklist</span>Selected Roster</h3>
+            <p id="cl-roster-caption">No cleaners selected yet.</p>
+          </div>
+        </div>
+        <div class="cl-panel-body">
+          <div class="cl-roster-list" id="cl-roster-list">
+            <div class="cl-roster-empty">Select members from the list →</div>
+          </div>
+          <div class="cl-actions">
+            <button class="cl-btn cl-btn-primary" id="cl-save-btn" type="button">
+              <span class="material-symbols-rounded">save</span>Save Assignment
+            </button>
+            <button class="cl-btn" id="cl-clear-btn" type="button">
+              <span class="material-symbols-rounded">clear_all</span>Clear
+            </button>
+            <button class="cl-btn cl-btn-danger" id="cl-delete-btn" type="button" style="margin-left:auto;">
+              <span class="material-symbols-rounded">delete</span>Delete Event
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Legend -->
+      <div class="cl-panel">
+        <div class="cl-panel-head"><div><h3>Priority Legend</h3><p>How members are scored for recommendation.</p></div></div>
+        <div class="cl-panel-body" style="display:grid;gap:7px;">
+          <div style="display:flex;align-items:center;gap:8px;font-size:10px;">
+            <span class="cl-rec-badge cl-rec-hot">★ NEVER ASSIGNED</span><span style="color:var(--muted);">Never cleaned before — highest priority</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;font-size:10px;">
+            <span class="cl-rec-badge cl-rec-high">↑ HIGH PRIORITY</span><span style="color:var(--muted);">Last assigned 60+ days ago</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;font-size:10px;">
+            <span class="cl-rec-badge cl-rec-rec">✓ RECOMMENDED</span><span style="color:var(--muted);">Last assigned 30–59 days ago</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;font-size:10px;">
+            <span class="cl-rec-badge cl-rec-warn">◎ RECENT</span><span style="color:var(--muted);">Last assigned 14–29 days ago</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;font-size:10px;">
+            <span class="cl-rec-badge cl-rec-none">— JUST ASSIGNED</span><span style="color:var(--muted);">Assigned within last 13 days</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── History Section ── -->
+  <div style="padding: 0 24px 48px; max-width:1400px; margin: 0 auto;">
+    <div class="cl-panel">
+      <div class="cl-panel-head" style="flex-wrap:wrap;gap:8px;">
+        <div>
+          <h3><span class="material-symbols-rounded" style="font-size:15px;vertical-align:-3px;margin-right:4px;">history</span>Assignment History</h3>
+          <p>All past cleaner assignments saved to Google Sheets.</p>
+        </div>
+        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+          <input class="cl-input" id="cl-hist-from" type="date" style="width:130px;" title="History from">
+          <span style="font-size:10px;color:var(--muted);">to</span>
+          <input class="cl-input" id="cl-hist-to" type="date" style="width:130px;" title="History to">
+          <button class="cl-btn" id="cl-hist-filter-btn" type="button"><span class="material-symbols-rounded">filter_list</span>Filter</button>
+          <button class="cl-btn" id="cl-hist-print-btn" type="button"><span class="material-symbols-rounded">print</span>Print</button>
+        </div>
+      </div>
+      <div class="cl-history-wrap">
+        <table class="cl-history-table">
+          <thead>
+            <tr>
+              <th>#</th><th>Date</th><th>Event</th><th>Cleaners</th><th>Count</th><th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="cl-history-body">
+            <tr><td colspan="6" class="cl-empty">Loading history…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</section>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════════════════
+   CLEANERS MODULE STATE & ALGORITHM
+   Priority scoring: higher score = assigned longer ago = more urgent
+   Score = days since last assignment (Infinity for never assigned)
+══════════════════════════════════════════════════════════════════════════ */
+const cleanersState = {
+  allMembers   : [],   // active members from getAllMembers
+  assignments  : [],   // all rows from getCleanerAssignments
+  memberScores : {},   // { memberId: { daysSince, lastDate, score } }
+  selected     : [],   // [{memberId, memberName}] — current roster
+  filterQuery  : '',
+  sortMode     : 'priority', // 'priority' | 'name' | 'id'
+  historyData  : [],
+};
+
+/* ── Recommendation tier ── */
+function cleanerTier(daysSince) {
+  if (daysSince === Infinity)  return { key: 'hot',  label: '★ NEVER ASSIGNED', cls: 'cl-rec-hot',  score: 1e9 };
+  if (daysSince >= 60)         return { key: 'high', label: '↑ HIGH PRIORITY',  cls: 'cl-rec-high', score: daysSince };
+  if (daysSince >= 30)         return { key: 'rec',  label: '✓ RECOMMENDED',    cls: 'cl-rec-rec',  score: daysSince };
+  if (daysSince >= 14)         return { key: 'warn', label: '◎ RECENT',         cls: 'cl-rec-warn', score: daysSince };
+  return                              { key: 'none', label: '— JUST ASSIGNED',  cls: 'cl-rec-none', score: daysSince };
+}
+
+/* ── Build per-member scores from historical assignments ── */
+function buildMemberScores(assignments) {
+  const today  = new Date(); today.setHours(0,0,0,0);
+  const latest = {};                          // memberId → latestDate string
+  assignments.forEach(a => {
+    if (!a.memberId) return;
+    if (!latest[a.memberId] || a.eventDate > latest[a.memberId]) {
+      latest[a.memberId] = a.eventDate;
+    }
+  });
+  const scores = {};
+  cleanersState.allMembers.forEach(m => {
+    const last = latest[m.memberId];
+    let days = Infinity;
+    if (last) {
+      const lastDate = new Date(last); lastDate.setHours(0,0,0,0);
+      days = Math.floor((today - lastDate) / 86400000);
+    }
+    scores[m.memberId] = { daysSince: days, lastDate: last || null };
+  });
+  return scores;
+}
+
+/* ── Member initials ── */
+function clInitials(name) {
+  const words = String(name || '').replace(/^(BRO\.|SIS\.)\s*/i,'').trim().split(/\s+/);
+  return ((words[0]?.[0] || '') + (words[1]?.[0] || '')).toUpperCase() || '?';
+}
+
+/* ── Sorted + filtered member list ── */
+function cleanerFilteredMembers() {
+  const q  = cleanersState.filterQuery.toLowerCase();
+  let list = cleanersState.allMembers.filter(m =>
+    (m.membershipStatus || '').toLowerCase() === 'active' &&
+    (m.activityStatus   || '').toLowerCase() !== 'inactive' &&
+    (`${m.memberId} ${m.name}`).toLowerCase().includes(q)
+  );
+  const scores = cleanersState.memberScores;
+  if (cleanersState.sortMode === 'priority') {
+    list.sort((a, b) => {
+      const sa = scores[a.memberId]?.daysSince ?? Infinity;
+      const sb = scores[b.memberId]?.daysSince ?? Infinity;
+      return sb - sa;   // highest daysSince first
+    });
+  } else if (cleanersState.sortMode === 'name') {
+    list.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+  } else {
+    list.sort((a, b) => (a.memberId || '').localeCompare(b.memberId || ''));
+  }
+  return list;
+}
+
+/* ── Render member picker list ── */
+function renderCleanerList() {
+  const container = document.getElementById('cl-member-list');
+  const members   = cleanerFilteredMembers();
+  const selectedIds = new Set(cleanersState.selected.map(s => s.memberId));
+
+  container.replaceChildren();
+  if (!members.length) {
+    const div = document.createElement('div'); div.className = 'cl-empty';
+    div.innerHTML = '<span class="material-symbols-rounded">search_off</span>No active members match this search.';
+    container.appendChild(div); return;
+  }
+
+  members.forEach(m => {
+    const sc     = cleanersState.memberScores[m.memberId] || { daysSince: Infinity, lastDate: null };
+    const tier   = cleanerTier(sc.daysSince);
+    const isSel  = selectedIds.has(m.memberId);
+
+    const item = document.createElement('div');
+    item.className = 'cl-member-item' + (isSel ? ' selected' : '');
+    item.dataset.id = m.memberId;
+
+    // Checkbox
+    const chk = document.createElement('div'); chk.className = 'cl-check';
+    const tick = document.createElement('span'); tick.className = 'material-symbols-rounded cl-check-tick'; tick.textContent = 'check';
+    chk.appendChild(tick);
+
+    // Avatar
+    const av = document.createElement('div'); av.className = 'cl-member-avatar';
+    av.textContent = clInitials(m.name);
+
+    // Body
+    const body = document.createElement('div'); body.className = 'cl-member-body';
+    const nameEl = document.createElement('div'); nameEl.className = 'cl-member-name'; nameEl.textContent = m.name || 'Unknown';
+    const meta = document.createElement('div'); meta.className = 'cl-member-meta';
+    const idEl = document.createElement('span'); idEl.className = 'cl-member-id'; idEl.textContent = m.memberId;
+
+    // Recommendation badge
+    const badge = document.createElement('span');
+    badge.className = 'cl-rec-badge ' + tier.cls;
+    badge.textContent = tier.label;
+
+    // Days since
+    const daysEl = document.createElement('span'); daysEl.className = 'cl-days-ago';
+    daysEl.textContent = sc.daysSince === Infinity
+      ? 'Never cleaned'
+      : sc.daysSince === 0 ? 'Assigned today'
+      : `${sc.daysSince}d ago`;
+
+    meta.append(idEl, badge, daysEl);
+    body.append(nameEl, meta);
+    item.append(chk, av, body);
+
+    item.addEventListener('click', () => toggleCleanerSelection(m));
+    container.appendChild(item);
+  });
+}
+
+/* ── Toggle selection ── */
+function toggleCleanerSelection(member) {
+  const idx = cleanersState.selected.findIndex(s => s.memberId === member.memberId);
+  const target = parseInt(document.getElementById('cl-target-count').value, 10) || 9;
+  if (idx >= 0) {
+    cleanersState.selected.splice(idx, 1);
+  } else {
+    if (cleanersState.selected.length >= target + 3) {
+      showToast(`Roster already has ${cleanersState.selected.length} cleaners. Remove one first or increase the target.`, 'error'); return;
+    }
+    cleanersState.selected.push({ memberId: member.memberId, memberName: member.name });
+  }
+  renderCleanerList();
+  renderCleanerRoster();
+  updateSlotBar();
+}
+
+/* ── Right panel roster ── */
+function renderCleanerRoster() {
+  const list    = document.getElementById('cl-roster-list');
+  const caption = document.getElementById('cl-roster-caption');
+  const n       = cleanersState.selected.length;
+  const target  = parseInt(document.getElementById('cl-target-count').value, 10) || 9;
+  caption.textContent = n === 0 ? 'No cleaners selected yet.'
+    : n < target ? `${n} selected — need ${target - n} more.`
+    : n === target ? `✓ ${n} cleaners — roster full!`
+    : `${n} selected (${n - target} over target)`;
+
+  list.replaceChildren();
+  if (!n) {
+    const empty = document.createElement('div'); empty.className = 'cl-roster-empty';
+    empty.textContent = 'Select members from the list →'; list.appendChild(empty); return;
+  }
+  cleanersState.selected.forEach((s, i) => {
+    const item = document.createElement('div'); item.className = 'cl-roster-item';
+    const num  = document.createElement('div'); num.className = 'cl-roster-num'; num.textContent = i + 1;
+    const body = document.createElement('div'); body.style.cssText = 'flex:1;min-width:0;';
+    const name = document.createElement('div'); name.className = 'cl-roster-name'; name.textContent = s.memberName;
+    const id   = document.createElement('div'); id.className = 'cl-roster-id'; id.textContent = s.memberId;
+    body.append(name, id);
+    const rm = document.createElement('button'); rm.className = 'cl-roster-rm'; rm.type = 'button'; rm.title = 'Remove';
+    rm.innerHTML = '<span class="material-symbols-rounded" style="font-size:15px;">close</span>';
+    rm.addEventListener('click', () => {
+      cleanersState.selected = cleanersState.selected.filter(x => x.memberId !== s.memberId);
+      renderCleanerList(); renderCleanerRoster(); updateSlotBar();
+    });
+    item.append(num, body, rm); list.appendChild(item);
+  });
+}
+
+/* ── Slot progress bar ── */
+function updateSlotBar() {
+  const n      = cleanersState.selected.length;
+  const target = parseInt(document.getElementById('cl-target-count').value, 10) || 9;
+  const pct    = Math.min(100, Math.round((n / target) * 100));
+  const fill   = document.getElementById('cl-slot-fill');
+  const bar    = document.getElementById('cl-progress-bar');
+  fill.textContent = `${n} / ${target}`;
+  fill.className  = 'cl-slot-fill ' + (n > target ? 'over' : n === target ? 'full' : 'under');
+  bar.style.width = pct + '%';
+  bar.className   = 'cl-progress-bar ' + (n > target ? 'over' : n === target ? 'full' : '');
+}
+
+/* ── History table ── */
+function renderCleanerHistory(data) {
+  const tbody = document.getElementById('cl-history-body');
+  tbody.replaceChildren();
+  if (!data.length) {
+    const tr = document.createElement('tr'); const td = document.createElement('td');
+    td.colSpan = 6; td.className = 'cl-empty';
+    td.innerHTML = '<span class="material-symbols-rounded">history</span>No assignment history found.';
+    tr.appendChild(td); tbody.appendChild(tr); return;
+  }
+  // Sort descending (newest first)
+  const sorted = [...data].sort((a, b) => b.eventDate.localeCompare(a.eventDate));
+  sorted.forEach((group, i) => {
+    const tr  = document.createElement('tr');
+    const num = document.createElement('td'); num.textContent = sorted.length - i; num.style.color = 'var(--muted)';
+    const dateCell  = document.createElement('td');
+    dateCell.innerHTML = `<div class="cl-history-date">${formatDisplayDate(group.eventDate)}</div>
+      <div class="cl-history-label">${escapeHtml(group.eventLabel)}</div>`;
+    const eventCell = document.createElement('td');
+    const eventBadge = document.createElement('span');
+    eventBadge.className = 'badge badge-blue'; eventBadge.textContent = group.eventLabel;
+    eventCell.appendChild(eventBadge);
+    const namesCell = document.createElement('td'); namesCell.className = 'cl-history-names';
+    group.members.forEach(m => {
+      const b = document.createElement('span'); b.className = 'cl-history-badge';
+      b.textContent = m.memberName || m.memberId; namesCell.appendChild(b);
+    });
+    const countCell = document.createElement('td');
+    countCell.innerHTML = `<strong>${group.members.length}</strong>`;
+    const actCell = document.createElement('td');
+    // Load into editor button
+    const loadBtn = document.createElement('button'); loadBtn.className = 'cl-btn'; loadBtn.type = 'button'; loadBtn.style.padding = '2px 8px'; loadBtn.style.minHeight = '26px'; loadBtn.style.fontSize = '9px';
+    loadBtn.innerHTML = '<span class="material-symbols-rounded" style="font-size:13px">edit</span>Edit';
+    loadBtn.addEventListener('click', () => loadHistoryIntoEditor(group));
+    const delBtn = document.createElement('button'); delBtn.className = 'cl-btn cl-btn-danger'; delBtn.type = 'button'; delBtn.style.padding = '2px 8px'; delBtn.style.minHeight = '26px'; delBtn.style.fontSize = '9px';
+    delBtn.innerHTML = '<span class="material-symbols-rounded" style="font-size:13px">delete</span>';
+    delBtn.addEventListener('click', () => deleteHistoryEvent(group));
+    actCell.style.display = 'flex'; actCell.style.gap = '4px';
+    actCell.append(loadBtn, delBtn);
+    tr.append(num, dateCell, eventCell, namesCell, countCell, actCell);
+    tbody.appendChild(tr);
+  });
+}
+
+function formatDisplayDate(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso + 'T00:00:00');
+  return d.toLocaleDateString('en-PH', { year:'numeric', month:'short', day:'numeric' });
+}
+
+/* ── Load a history event back into the editor ── */
+function loadHistoryIntoEditor(group) {
+  document.getElementById('cl-event-date').value  = group.eventDate;
+  document.getElementById('cl-event-label').value = group.eventLabel;
+  cleanersState.selected = group.members.map(m => ({ memberId: m.memberId, memberName: m.memberName }));
+  renderCleanerList(); renderCleanerRoster(); updateSlotBar();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+  showToast(`Loaded ${group.members.length} cleaners from ${formatDisplayDate(group.eventDate)}.`, 'success');
+}
+
+/* ── Delete a history event ── */
+async function deleteHistoryEvent(group) {
+  if (!confirm(`Delete all cleaners for ${formatDisplayDate(group.eventDate)} — ${group.eventLabel}?`)) return;
+  const btn = document.getElementById('cl-delete-btn');
+  await window.runButtonAction(btn, async () => {
+    const result = await apiCall('deleteCleanerAssignment', group.eventDate, group.eventLabel);
+    showToast(result.message, 'success');
+    await refreshCleanerHistory();
+    await refreshMemberScores();
+  }, 'Deleting…');
+}
+
+/* ── Refresh history from backend ── */
+async function refreshCleanerHistory() {
+  const from = document.getElementById('cl-hist-from').value || '';
+  const to   = document.getElementById('cl-hist-to').value   || '';
+  cleanersState.historyData = await apiCall('getCleanersPrintView', from, to);
+  renderCleanerHistory(cleanersState.historyData);
+  document.getElementById('cleaners-page-caption').textContent =
+    `${cleanersState.historyData.length} event${cleanersState.historyData.length !== 1 ? 's' : ''} recorded`;
+}
+
+/* ── Refresh member scores ── */
+async function refreshMemberScores() {
+  cleanersState.assignments   = await apiCall('getCleanerAssignments');
+  cleanersState.memberScores  = buildMemberScores(cleanersState.assignments);
+  renderCleanerList();
+}
+
+/* ── Save assignment ── */
+async function saveCleanerAssignmentFromUI() {
+  const eventDate  = document.getElementById('cl-event-date').value;
+  const eventLabel = document.getElementById('cl-event-label').value.trim() || 'Thanksgiving';
+  if (!eventDate)  { showToast('Please set the event date first.', 'error'); return; }
+  if (!cleanersState.selected.length) { showToast('Select at least one cleaner.', 'error'); return; }
+  const btn = document.getElementById('cl-save-btn');
+  await window.runButtonAction(btn, async () => {
+    const result = await apiCall('saveCleanerAssignment', {
+      eventDate, eventLabel, assignees: cleanersState.selected
+    });
+    showToast(result.message, 'success');
+    await refreshCleanerHistory();
+    await refreshMemberScores();
+  }, 'Saving…');
+}
+
+/* ── Print / Export ── */
+function printCleanerHistory() {
+  const data   = cleanersState.historyData;
+  if (!data.length) { showToast('No history to print.', 'error'); return; }
+  const sorted = [...data].sort((a, b) => a.eventDate.localeCompare(b.eventDate));
+  // Group by month
+  const months = {};
+  sorted.forEach(g => {
+    const monthKey = g.eventDate.slice(0, 7);
+    if (!months[monthKey]) months[monthKey] = [];
+    months[monthKey].push(g);
+  });
+  let html = `<!DOCTYPE html><html><head><meta charset="utf-8">
+  <title>Cleaner Assignments</title>
+  <style>
+    body { font-family: "Segoe UI", sans-serif; font-size: 11px; color: #111; margin: 24px; }
+    h1   { font-size: 17px; margin-bottom: 4px; }
+    h2   { font-size: 13px; margin: 20px 0 8px; color: #2563eb; border-bottom: 2px solid #2563eb; padding-bottom: 4px; }
+    h3   { font-size: 11px; margin: 12px 0 4px; font-weight: 700; }
+    table { border-collapse: collapse; width: 100%; margin-bottom: 8px; }
+    th,td { border: 1px solid #d1d5db; padding: 5px 8px; text-align: left; }
+    th { background: #f3f4f6; font-weight: 700; }
+    @media print { body { margin: 8px; } h2 { page-break-before: auto; } }
+  </style></head><body>
+  <h1>Cleaners Assignment Record</h1>
+  <p>Clark Advent Youth Fellowship — Printed ${new Date().toLocaleDateString('en-PH',{dateStyle:'long'})}</p>`;
+  Object.entries(months).forEach(([monthKey, groups]) => {
+    const d = new Date(monthKey + '-01');
+    const monthLabel = d.toLocaleDateString('en-PH', { year:'numeric', month:'long' });
+    html += `<h2>${monthLabel}</h2>`;
+    groups.forEach(g => {
+      html += `<h3>${formatDisplayDate(g.eventDate)}${g.eventLabel && g.eventLabel !== 'Thanksgiving' ? ` — ${g.eventLabel}` : ''}</h3>
+      <table><thead><tr><th>No.</th><th>Member ID</th><th>Full Name</th></tr></thead><tbody>`;
+      g.members.forEach((m, i) => {
+        html += `<tr><td>${i+1}</td><td>${escapeHtml(m.memberId)}</td><td>${escapeHtml(m.memberName)}</td></tr>`;
+      });
+      html += `</tbody></table>`;
+    });
+  });
+  html += '</body></html>';
+  const win = window.open('', '_blank');
+  win.document.write(html); win.document.close(); win.focus(); win.print();
+}
+
+/* ── Main load function (called by navigateTo) ── */
+async function loadCleanersPage() {
+  if (state.page !== 'Cleaners') return;
+  try {
+    // Set default date to next Saturday
+    const today = new Date();
+    const daysToSat = (6 - today.getDay() + 7) % 7 || 7;
+    const nextSat = new Date(today); nextSat.setDate(today.getDate() + daysToSat);
+    document.getElementById('cl-event-date').value = nextSat.toISOString().slice(0, 10);
+
+    // Default history range: 6 months back
+    const sixMonthsAgo = new Date(); sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+    document.getElementById('cl-hist-from').value = sixMonthsAgo.toISOString().slice(0,10);
+    document.getElementById('cl-hist-to').value   = '';
+
+    // Load data
+    [cleanersState.allMembers, cleanersState.assignments] = await Promise.all([
+      apiCall('getAllMembers'),
+      apiCall('getCleanerAssignments'),
+    ]);
+    cleanersState.memberScores = buildMemberScores(cleanersState.assignments);
+    renderCleanerList();
+    renderCleanerRoster();
+    updateSlotBar();
+
+    cleanersState.historyData = await apiCall('getCleanersPrintView', sixMonthsAgo.toISOString().slice(0,10), '');
+    renderCleanerHistory(cleanersState.historyData);
+    document.getElementById('cleaners-page-caption').textContent =
+      `${cleanersState.historyData.length} event${cleanersState.historyData.length !== 1 ? 's' : ''} recorded · ${cleanersState.allMembers.filter(m=>(m.membershipStatus||'').toLowerCase()==='active').length} active members`;
+
+    state.loadedPages.Cleaners = true;
+  } catch (error) { showToast(error.message || 'Unable to load cleaners module.', 'error'); }
+}
+
+/* ── Bind events ── */
+(function bindCleanersPage() {
+  // Member search
+  document.getElementById('cl-member-search').addEventListener('input', e => {
+    cleanersState.filterQuery = e.target.value;
+    renderCleanerList();
+  });
+
+  // Sort buttons
+  document.querySelectorAll('#cleaners-page .cl-sort-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('#cleaners-page .cl-sort-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      cleanersState.sortMode = btn.dataset.sort;
+      renderCleanerList();
+    });
+  });
+
+  // Target count change → update progress bar
+  document.getElementById('cl-target-count').addEventListener('change', () => {
+    updateSlotBar(); renderCleanerRoster();
+  });
+
+  // Save
+  document.getElementById('cl-save-btn').addEventListener('click', saveCleanerAssignmentFromUI);
+
+  // Clear
+  document.getElementById('cl-clear-btn').addEventListener('click', () => {
+    if (cleanersState.selected.length && !confirm('Clear the selected roster?')) return;
+    cleanersState.selected = [];
+    renderCleanerList(); renderCleanerRoster(); updateSlotBar();
+  });
+
+  // Delete event (uses current date/label in form)
+  document.getElementById('cl-delete-btn').addEventListener('click', async () => {
+    const d = document.getElementById('cl-event-date').value;
+    const l = document.getElementById('cl-event-label').value.trim() || 'Thanksgiving';
+    if (!d) { showToast('Set event date first.', 'error'); return; }
+    if (!confirm(`Delete all cleaners for ${formatDisplayDate(d)} — ${l}?`)) return;
+    const btn = document.getElementById('cl-delete-btn');
+    await window.runButtonAction(btn, async () => {
+      const r = await apiCall('deleteCleanerAssignment', d, l);
+      showToast(r.message, 'success');
+      cleanersState.selected = [];
+      renderCleanerList(); renderCleanerRoster(); updateSlotBar();
+      await refreshCleanerHistory(); await refreshMemberScores();
+    }, 'Deleting…');
+  });
+
+  // History filter
+  document.getElementById('cl-hist-filter-btn').addEventListener('click', refreshCleanerHistory);
+  document.getElementById('cl-hist-print-btn').addEventListener('click', printCleanerHistory);
+})();
+</script>

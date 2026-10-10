@@ -681,6 +681,7 @@
         <li><button class="nav-link" data-page="Demographics"><span class="material-symbols-rounded">bar_chart</span>Demographics</button></li>
         <li><button class="nav-link" data-page="Statistics"><span class="material-symbols-rounded">query_stats</span>Statistics</button></li>
         <li><button class="nav-link" data-page="Reports"><span class="material-symbols-rounded">description</span>Reports</button></li>
+        <li><button class="nav-link" data-page="Cleaners"><span class="material-symbols-rounded">mop</span>Cleaners Assign</button></li>
         <li><button class="nav-link" data-page="Settings"><span class="material-symbols-rounded">settings</span>Settings</button></li>
       </ul></nav>
       <div class="sidebar-spacer"></div>
@@ -784,6 +785,7 @@
         <?!= include('Demographics'); ?>
         <?!= include('Statistics'); ?>
         <?!= include('Reports'); ?>
+        <?!= include('Cleaners'); ?>
         <?!= include('Settings'); ?>
         <style id="monochrome-responsive-theme">
           :root {
@@ -1453,7 +1455,7 @@
     const navIcons = {
       Dashboard: 'space_dashboard', Members: 'group', 'Fast Attendance': 'how_to_reg',
       'Weekly Schedule': 'event_repeat', 'Special Events': 'event', 'Event History': 'history', Announcements: 'campaign', Demographics: 'bar_chart',
-      Statistics: 'query_stats', Reports: 'description', Settings: 'settings'
+      Statistics: 'query_stats', Reports: 'description', Cleaners: 'mop', Settings: 'settings'
     };
     function apiCall(method, ...args) {
       const key = JSON.stringify([method, args]);
@@ -2041,6 +2043,7 @@
         Demographics: 'demographics-page',
         Statistics: 'statistics-page-module',
         Reports: 'reports-page',
+        Cleaners: 'cleaners-page',
         Settings: 'settings-page',
       };
       const isStatistics = page === 'Statistics';
@@ -2057,9 +2060,9 @@
         if (el) el.hidden = pageViews[page] !== id;
       });
       const placeholder = document.getElementById('placeholder-page');
-      placeholder.classList.toggle('show', !hasModule && !showStatisticsPlaceholder && page !== 'Demographics' && page !== 'Statistics' && page !== 'Reports' && page !== 'Settings');
-      document.getElementById('page-title').textContent = page === 'Dashboard' ? 'Members Statistics' : page;
-      document.getElementById('header-subtitle').textContent = page === 'Dashboard' ? 'Membership and attendance overview' : page === 'Demographics' ? 'Official demographic report' : page === 'Statistics' ? 'Membership statistics breakdown' : page === 'Reports' ? 'Administrative reporting overview' : page === 'Settings' ? 'System font size, display scaling, and visibility preferences' : page === 'Special Events' ? 'Create programs and schedule one-time gatherings' : page === 'Event History' ? 'Past event programs and saved attendance' : hasModule ? 'Membership office workspace' : `${page} module · planned workspace`;
+      placeholder.classList.toggle('show', !hasModule && !showStatisticsPlaceholder && page !== 'Demographics' && page !== 'Statistics' && page !== 'Reports' && page !== 'Cleaners' && page !== 'Settings');
+      document.getElementById('page-title').textContent = page === 'Dashboard' ? 'Members Statistics' : page === 'Cleaners' ? 'Cleaners Assignment' : page;
+      document.getElementById('header-subtitle').textContent = page === 'Dashboard' ? 'Membership and attendance overview' : page === 'Demographics' ? 'Official demographic report' : page === 'Statistics' ? 'Membership statistics breakdown' : page === 'Reports' ? 'Administrative reporting overview' : page === 'Cleaners' ? 'Smart assignment — active members ranked by priority' : page === 'Settings' ? 'System font size, display scaling, and visibility preferences' : page === 'Special Events' ? 'Create programs and schedule one-time gatherings' : page === 'Event History' ? 'Past event programs and saved attendance' : hasModule ? 'Membership office workspace' : `${page} module · planned workspace`;
       document.getElementById('top-actions').style.display = page === 'Dashboard' ? '' : 'none';
       document.getElementById('clark-launcher').classList.toggle('compact', page === 'Members');
       document.getElementById('placeholder-title').textContent = page === 'Dashboard' ? 'Dashboard is empty for now' : page;
@@ -2077,6 +2080,7 @@
       if (page === 'Demographics' && typeof loadDemographicsPage === 'function') loadModuleOnce(page, loadDemographicsPage);
       if (page === 'Statistics' && typeof loadStatisticsModule === 'function') loadModuleOnce(page, loadStatisticsModule);
       if (page === 'Reports' && typeof loadReportsModule === 'function') loadModuleOnce(page, loadReportsModule);
+      if (page === 'Cleaners' && typeof loadCleanersPage === 'function') loadModuleOnce(page, loadCleanersPage);
       if (page === 'Settings' && typeof loadSettingsModule === 'function') loadModuleOnce(page, loadSettingsModule);
     }
 

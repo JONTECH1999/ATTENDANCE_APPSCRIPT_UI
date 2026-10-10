@@ -3174,3 +3174,289 @@ function syncMemberAttendanceRollups() {
     lock.releaseLock();
   }
 }
+
+
+// ════════════════════════════════════════════════════════════════════════════
+//  CLEANERS ASSIGNMENT MODULE
+//  Sheet: CLEANERS_ASSIGNMENTS
+//  Columns: Assignment ID | Event Date | Event Label | Member ID | Member Name | Assigned At
+// ════════════════════════════════════════════════════════════════════════════
+
+const CLEANERS_SHEET_NAME = 'CLEANERS_ASSIGNMENTS';
+const CLEANERS_HEADERS    = ['Assignment ID','Event Date','Event Label','Member ID','Member Name','Assigned At'];
+
+/**
+ * Returns or creates the CLEANERS_ASSIGNMENTS sheet with the correct header row.
+ */
+function getCleanersSheet_() {
+  const ss    = getAttendanceSpreadsheet_();
+  let   sheet = ss.getSheetByName(CLEANERS_SHEET_NAME);
+  if (!sheet) {
+    sheet = ss.insertSheet(CLEANERS_SHEET_NAME);
+    sheet.getRange(1, 1, 1, CLEANERS_HEADERS.length).setValues([CLEANERS_HEADERS]);
+    sheet.setFrozenRows(1);
+    sheet.getRange(1, 1, 1, CLEANERS_HEADERS.length)
+      .setBackground('#1f2937').setFontColor('#ffffff').setFontWeight('bold');
+  }
+  return sheet;
+}
+
+/**
+ * Normalise any value Sheets returns for a date cell into a YYYY-MM-DD string.
+ * Sheets auto-promotes date-like strings to Date objects, so String(dateObj)
+ * produces a locale-specific string the browser cannot reliably parse.
+ */
+function toIsoDateStr_(val) {
+  if (!val) return '';
+  if (val instanceof Date) {
+    // Use UTC parts to avoid timezone shifts
+    const y = val.getFullYear();
+    const m = String(val.getMonth() + 1).padStart(2, '0');
+    const d = String(val.getDate()).padStart(2, '0');
+    return y + '-' + m + '-' + d;
+  }
+  const s = String(val).trim();
+  // Already YYYY-MM-DD
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  // Try parsing anything else
+  const parsed = new Date(s);
+  if (!isNaN(parsed.getTime())) {
+    const y = parsed.getFullYear();
+    const m = String(parsed.getMonth() + 1).padStart(2, '0');
+    const d = String(parsed.getDate()).padStart(2, '0');
+    return y + '-' + m + '-' + d;
+  }
+  return s; // return as-is if we can't parse
+}
+
+/**
+ * Reads all rows from CLEANERS_ASSIGNMENTS and returns them as objects.
+ * eventDate is always returned as YYYY-MM-DD so the browser can parse it.
+ */
+function getCleanerAssignments() {
+  requireAttendanceAccess_();
+  const sheet = getCleanersSheet_();
+  const values = sheet.getDataRange().getValues();
+  if (values.length <= 1) return [];
+  const headers = values[0].map(h => String(h).trim());
+  const idx = col => headers.indexOf(col);
+  return values.slice(1).map(row => ({
+    assignmentId : String(row[idx('Assignment ID')] || ''),
+    eventDate    : toIsoDateStr_(row[idx('Event Date')]),
+    eventLabel   : String(row[idx('Event Label')]   || ''),
+    memberId     : String(row[idx('Member ID')]     || ''),
+    memberName   : String(row[idx('Member Name')]   || ''),
+    assignedAt   : String(row[idx('Assigned At')]   || ''),
+  })).filter(r => r.memberId);
+}
+
+/**
+ * Saves a cleaner assignment for one event.
+ * payload = { eventDate, eventLabel, assignees: [{memberId, memberName}] }
+ * Re-saves are safe: prior rows for same date+label are removed first.
+ */
+function saveCleanerAssignment(payload) {
+  requireAttendanceAccess_();
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    const sheet     = getCleanersSheet_();
+    const now       = new Date();
+    const eventDate = String(payload.eventDate  || '').trim();
+    const label     = String(payload.eventLabel || 'Thanksgiving').trim();
+    const assignees = Array.isArray(payload.assignees) ? payload.assignees : [];
+    if (!eventDate) throw new Error('Event date is required.');
+    if (!assignees.length) throw new Error('Select at least one member to assign.');
+
+    // Remove prior rows for same event date + label (normalise cell values first)
+    const existing = sheet.getDataRange().getValues();
+    const toDelete = [];
+    for (let r = existing.length - 1; r >= 1; r--) {
+      if (toIsoDateStr_(existing[r][1]) === eventDate && String(existing[r][2]) === label) {
+        toDelete.push(r + 1);
+      }
+    }
+    toDelete.forEach(rowNum => sheet.deleteRow(rowNum));
+
+    // Append new rows
+    const rows = assignees.map((a, i) => [
+      'CL-' + eventDate + '-' + (i + 1),
+      eventDate,
+      label,
+      String(a.memberId   || '').trim(),
+      String(a.memberName || '').trim(),
+      now.toISOString(),
+    ]);
+    if (rows.length) {
+      const startRow = sheet.getLastRow() + 1;
+      const range = sheet.getRange(startRow, 1, rows.length, CLEANERS_HEADERS.length);
+      range.setValues(rows);
+      // Keep Event Date column as plain text to prevent auto-conversion to Date
+      sheet.getRange(startRow, 2, rows.length, 1).setNumberFormat('@STRING@');
+    }
+    logAction('SAVE_CLEANER_ASSIGNMENT', { eventDate: eventDate, label: label, count: rows.length });
+    return { success: true, message: rows.length + ' cleaner' + (rows.length !== 1 ? 's' : '') + ' saved for ' + label + ' on ' + eventDate + '.' };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/**
+ * Deletes all assignment rows for a given eventDate + eventLabel pair.
+ */
+function deleteCleanerAssignment(eventDate, eventLabel) {
+  requireAttendanceAccess_();
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    const sheet  = getCleanersSheet_();
+    const values = sheet.getDataRange().getValues();
+    const toDelete = [];
+    for (let r = values.length - 1; r >= 1; r--) {
+      if (toIsoDateStr_(values[r][1]) === eventDate && String(values[r][2]) === eventLabel) {
+        toDelete.push(r + 1);
+      }
+    }
+    toDelete.forEach(rowNum => sheet.deleteRow(rowNum));
+    logAction('DELETE_CLEANER_ASSIGNMENT', { eventDate: eventDate, eventLabel: eventLabel, removed: toDelete.length });
+    return { success: true, message: 'Removed ' + toDelete.length + ' cleaner record(s) for ' + eventDate + '.' };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/**
+ * Returns grouped cleaner history for a date range (for print/export).
+ */
+function getCleanersPrintView(startDate, endDate) {
+  requireAttendanceAccess_();
+  const all = getCleanerAssignments();
+  const filtered = all.filter(r => {
+    if (startDate && r.eventDate < startDate) return false;
+    if (endDate   && r.eventDate > endDate)   return false;
+    return true;
+  });
+  const groups = Object.create(null);
+  filtered.forEach(r => {
+    const key = r.eventDate + '|||' + r.eventLabel;
+    if (!groups[key]) groups[key] = { eventDate: r.eventDate, eventLabel: r.eventLabel, members: [] };
+    groups[key].members.push({ memberId: r.memberId, memberName: r.memberName });
+  });
+  return Object.values(groups).sort(function(a, b) { return a.eventDate.localeCompare(b.eventDate); });
+}
+
+
+// ════════════════════════════════════════════════════════════════════════════
+//  ONE-TIME SEED: pre-populate historical cleaner assignments (June–Oct 2026)
+//  Run this ONCE from the Apps Script editor: Extensions → Apps Script → Run
+//  Function: seedCleanerHistory
+// ════════════════════════════════════════════════════════════════════════════
+function seedCleanerHistory() {
+  const HISTORY = [
+    // ── June 2026 ──
+    { date: '2026-06-13', label: 'Thanksgiving',
+      members: [['M-1048','BRO. ERJOHN'],['M-1084','BRO. JUDE'],['M-1103','BRO. MJ'],['M-1049','BRO. ERJOSH'],['M-1046','BRO. ERHIZE'],['M-1135','BRO. FRANZ']] },
+    { date: '2026-06-20', label: 'Thanksgiving',
+      members: [['M-1059','BRO. GERIC / MANUEL'],['M-1058','SIS. GENNA'],['M-1057','BRO. LUIS'],['M-1127','SIS. SHARMAINE'],['M-1125','BRO. SEAN'],['M-1066','BRO. JANVER']] },
+    { date: '2026-06-26', label: 'SPBB Day 1',
+      members: [['M-1076','SIS. JHELYN'],['M-1012','SIS. ANN-RHEA'],['M-1009','SIS. ANGELICA'],['M-1064','SIS. JAIRA'],['M-1029','BRO. DAZEOU'],['M-1036','BRO. DAVID']] },
+    { date: '2026-06-27', label: 'SPBB Day 2',
+      members: [['M-1099','SIS. MADEL'],['M-1013','SIS. ANNABEL'],['M-1123','BRO. RUDY'],['M-1124','BRO. SCOTT'],['M-1034','BRO. EJ'],['M-1045','SIS. ERICA']] },
+    { date: '2026-06-28', label: 'SPBB Day 3',
+      members: [['M-1004','BRO. ALJON'],['M-1007','BRO. ANDRO'],['M-1031','BRO. DHAVE'],['M-1117','BRO. RENCY'],['M-1054','SIS. FLORWYN'],['M-1063','SIS. HYACINTH'],['M-1052','BRO. EXUR']] },
+    // ── July 2026 ──
+    { date: '2026-07-11', label: 'Thanksgiving',
+      members: [['M-1132','BRO. VINCENT'],['M-1112','BRO. PAULO'],['M-1070','BRO. JEMSON'],['M-1107','SIS. NATHALIE'],['M-1062','SIS. HOPE'],['M-1133','BRO. ANTONY'],['M-1117','BRO. RENCY']] },
+    { date: '2026-07-18', label: 'Thanksgiving',
+      members: [['M-1026','SIS. CRISTEL'],['M-1097','SIS. CARELINE'],['M-1098','SIS. LESLIE'],['M-1086','SIS. JULIANNE'],['M-1022','BRO. CHRISTIAN'],['M-1089','BRO. KAIZER']] },
+    { date: '2026-07-25', label: 'Thanksgiving',
+      members: [['M-1135','BRO. FRANZ'],['M-1084','BRO. JUDE'],['M-1103','BRO. MJ'],['M-1059','BRO. GERIC / MANUEL'],['M-1058','SIS. GENNA'],['M-1057','BRO. LUIS']] },
+    // ── August 2026 ──
+    { date: '2026-08-01', label: 'Thanksgiving',
+      members: [['M-1048','BRO. ERJOHN'],['M-1049','BRO. ERJOSH'],['M-1046','BRO. ERHIZE'],['M-1099','SIS. MADEL'],['M-1013','SIS. ANNABEL'],['M-1076','SIS. JHELYN']] },
+    { date: '2026-08-08', label: 'Thanksgiving',
+      members: [['M-1066','BRO. JANVER'],['M-1078','BRO. JUAKI'],['M-1012','SIS. ANN-RHEA'],['M-1009','SIS. ANGELICA'],['M-1064','SIS. JAIRA'],['M-1029','BRO. DAZEOU']] },
+    { date: '2026-08-16', label: 'Thanksgiving',
+      members: [['M-1124','BRO. SCOTT'],['M-1034','BRO. EJ'],['M-1063','SIS. HYACINTH'],['M-1054','SIS. FLORWYN'],['M-1117','BRO. RENCY'],['M-1031','BRO. DHAVE']] },
+    { date: '2026-08-22', label: 'Thanksgiving',
+      members: [['M-1040','BRO. IAN'],['M-1043','BRO. EMAN'],['M-1002','SIS. AGATHA'],['M-1132','BRO. VINCENT'],['M-1112','BRO. PAULO'],['M-1004','BRO. ALJON'],['M-1036','BRO. DAVID']] },
+    { date: '2026-08-29', label: 'Thanksgiving',
+      members: [['M-1084','BRO. JUDE'],['M-1135','BRO. FRANZ'],['M-1103','BRO. MJ'],['M-1059','BRO. GERIC / MANUEL'],['M-1058','SIS. GENNA'],['M-1029','BRO. DAZEOU']] },
+    // ── September 2026 ──
+    { date: '2026-09-05', label: 'Thanksgiving',
+      members: [['M-1099','SIS. MADEL'],['M-1107','SIS. NATHALIE'],['M-1070','BRO. JEMSON'],['M-1052','BRO. EXUR'],['M-1089','BRO. KAIZER'],['M-1117','BRO. RENCY'],['M-1135','BRO. FRANZ']] },
+    { date: '2026-09-12', label: 'Thanksgiving',
+      members: [['M-1133','BRO. ANTONY'],['M-1022','BRO. CHRISTIAN'],['M-1036','BRO. DAVID'],['M-1012','SIS. ANN-RHEA'],['M-1009','SIS. ANGELICA'],['M-1064','SIS. JAIRA']] },
+    { date: '2026-09-19', label: 'Thanksgiving',
+      members: [['M-1124','BRO. SCOTT'],['M-1034','BRO. EJ'],['M-1004','BRO. ALJON'],['M-1026','SIS. CRISTEL'],['M-1097','SIS. CARELINE'],['M-1086','SIS. JULIANNE']] },
+    { date: '2026-09-26', label: 'Thanksgiving',
+      members: [['M-1058','SIS. GENNA'],['M-1059','BRO. GERIC / MANUEL'],['M-1057','BRO. LUIS'],['M-1048','BRO. ERJOHN'],['M-1049','BRO. ERJOSH'],['M-1135','BRO. FRANZ']] },
+    // ── October 2026 ──
+    { date: '2026-10-03', label: 'Thanksgiving',
+      members: [['M-1066','BRO. JANVER'],['M-1078','BRO. JUAKI'],['M-1002','SIS. AGATHA'],['M-1132','BRO. VINCENT'],['M-1112','BRO. PAULO'],['M-1090','BRO. KEN']] },
+    { date: '2026-10-09', label: 'SPBB Day 1',
+      members: [['M-1022','BRO. CHRISTIAN'],['M-1036','BRO. DAVID'],['M-1012','SIS. ANN-RHEA'],['M-1009','SIS. ANGELICA'],['M-1064','SIS. JAIRA'],['M-1052','BRO. EXUR']] },
+    { date: '2026-10-10', label: 'SPBB Day 2',
+      members: [['M-1124','BRO. SCOTT'],['M-1034','BRO. EJ'],['M-1029','BRO. DAZEOU'],['M-1107','SIS. NATHALIE'],['M-1062','SIS. HOPE'],['M-1070','BRO. JEMSON'],['M-1089','BRO. KAIZER'],['M-1053','SIS. FLORENCE'],['M-1040','BRO. IAN']] },
+  ];
+
+  const sheet  = getCleanersSheet_();
+  const now    = new Date();
+  const allRows = [];
+
+  HISTORY.forEach(event => {
+    event.members.forEach((m, i) => {
+      allRows.push([
+        'CL-' + event.date + '-' + (i + 1),
+        event.date,
+        event.label,
+        m[0],
+        m[1],
+        now.toISOString(),
+      ]);
+    });
+  });
+
+  // Clear existing data (keep header)
+  const lastRow = sheet.getLastRow();
+  if (lastRow > 1) sheet.getRange(2, 1, lastRow - 1, CLEANERS_HEADERS.length).clearContent();
+
+  // Write all seed rows
+  if (allRows.length) {
+    const range = sheet.getRange(2, 1, allRows.length, CLEANERS_HEADERS.length);
+    range.setValues(allRows);
+    // Force the Event Date column (col 2) to plain text so Sheets never
+    // auto-converts YYYY-MM-DD strings into Date objects.
+    sheet.getRange(2, 2, allRows.length, 1).setNumberFormat('@STRING@');
+  }
+
+  Logger.log('Seeded ' + allRows.length + ' cleaner assignment rows across ' + HISTORY.length + ' events.');
+  try {
+    SpreadsheetApp.getUi().alert('Seeded ' + allRows.length + ' historical cleaner records across ' + HISTORY.length + ' events.\n\nYou can now open the Cleaners Assign module in the dashboard.');
+  } catch (e) {}
+}
+
+/**
+ * Append a single cleaner assignment event to the CLEANERS_ASSIGNMENTS sheet.
+ * Useful for one‑off imports without re‑running the full seed.
+ *
+ * @param {string} eventDate   ISO date string (e.g. '2026-11-25')
+ * @param {string} eventLabel  Short label for the event (e.g. 'Thanksgiving')
+ * @param {Array<Array<string>>} members   Array of [memberId, memberName] pairs.
+ */
+function addCleanerEvent(eventDate, eventLabel, members) {
+  const sheet = getCleanersSheet_();
+  const now = new Date();
+  const rows = members.map((pair, i) => [
+    'CL-' + eventDate + '-' + (i + 1),
+    eventDate,
+    eventLabel,
+    pair[0],
+    pair[1],
+    now.toISOString()
+  ]);
+  if (rows.length) {
+    const lastRow = sheet.getLastRow();
+    sheet.getRange(lastRow + 1, 1, rows.length, CLEANERS_HEADERS.length).setValues(rows);
+  }
+}
