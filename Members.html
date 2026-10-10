@@ -1,42 +1,280 @@
 <section id="members-page" class="module-view" hidden>
+<style>
+  /* ── Members module responsive styles ── */
+
+  /* Toolbar: search + actions wrap cleanly on small screens */
+  #members-page .member-actions-row {
+    display: flex; flex-wrap: wrap; align-items: center;
+    gap: 8px; padding: 12px 14px;
+    border-bottom: 1px solid var(--line);
+  }
+  #members-page .module-search { flex: 1 1 220px; min-width: 0; }
+  #members-page .action-buttons {
+    display: flex; flex-wrap: wrap; gap: 6px;
+    flex-shrink: 0;
+  }
+
+  /* Filter row: horizontally scrollable on small screens */
+  #members-page .member-filter-row {
+    display: flex; align-items: center;
+    gap: 6px; padding: 8px 14px;
+    overflow-x: auto; -webkit-overflow-scrolling: touch;
+    border-bottom: 1px solid var(--line);
+    white-space: nowrap;
+    scrollbar-width: none;
+  }
+  #members-page .member-filter-row::-webkit-scrollbar { display: none; }
+  #members-page .filter-count {
+    margin-left: auto; flex-shrink: 0;
+    color: var(--muted); font-size: 10px;
+    padding-left: 8px;
+  }
+  #members-page .module-select { flex-shrink: 0; }
+
+  /* ── Desktop table view (default) ── */
+  .members-directory-scroll { overflow: auto; }
+
+  /* ── Mobile card view: hidden by default, shown on phone ── */
+  .members-card-list { display: none; }
+
+  /* Member card */
+  .member-card {
+    display: flex; align-items: flex-start;
+    gap: 10px; padding: 12px 14px;
+    border-bottom: 1px solid var(--line);
+    background: var(--surface);
+    cursor: pointer;
+    transition: background .12s;
+  }
+  .member-card:last-child { border-bottom: none; }
+  .member-card:active { background: var(--primary-soft); }
+
+  .member-card-avatar {
+    display: grid; place-items: center;
+    width: 38px; height: 38px; flex-shrink: 0;
+    border-radius: 50%;
+    background: color-mix(in srgb, var(--primary) 14%, var(--canvas));
+    color: var(--primary);
+    font: 700 13px "Manrope", sans-serif;
+    border: 1px solid color-mix(in srgb, var(--primary) 22%, transparent);
+  }
+
+  .member-card-body { flex: 1; min-width: 0; }
+  .member-card-top {
+    display: flex; align-items: flex-start;
+    justify-content: space-between; gap: 6px;
+  }
+  .member-card-name {
+    font: 700 12px "DM Sans", sans-serif;
+    color: var(--ink);
+    overflow-wrap: anywhere;
+    flex: 1; min-width: 0;
+  }
+  .member-card-id {
+    font: 600 10px ui-monospace, monospace;
+    color: var(--primary);
+    white-space: nowrap; flex-shrink: 0;
+    padding: 1px 5px; background: var(--primary-soft);
+    border-radius: 3px;
+  }
+  .member-card-contact {
+    display: block; margin-top: 1px;
+    font-size: 10px; color: var(--muted);
+  }
+  .member-card-badges {
+    display: flex; flex-wrap: wrap; gap: 4px;
+    margin-top: 6px; align-items: center;
+  }
+  .member-card-meta {
+    display: flex; align-items: center;
+    justify-content: space-between; gap: 8px;
+    margin-top: 7px;
+  }
+  .member-card-rate {
+    font: 700 11px "Manrope", sans-serif;
+    color: var(--primary);
+  }
+  .member-card-rate.at-risk { color: #a15e00; }
+  .member-card-last {
+    font-size: 10px; color: var(--muted);
+    white-space: nowrap;
+  }
+  .member-card-actions {
+    display: flex; gap: 2px; align-items: center;
+    flex-shrink: 0;
+  }
+
+  /* Expanded detail panel inside card list */
+  .member-card-detail {
+    background: var(--canvas);
+    border-bottom: 1px solid var(--line);
+    padding: 0;
+    overflow: hidden;
+    max-height: 0;
+    transition: max-height .22s ease, padding .22s ease;
+  }
+  .member-card-detail.open {
+    max-height: 800px;
+    padding: 12px 14px 14px;
+  }
+  .member-card-detail-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(140px, 100%), 1fr));
+    gap: 8px 14px;
+    margin-bottom: 10px;
+  }
+  .member-card-detail-field span {
+    display: block; font-size: 9px; color: var(--muted);
+    text-transform: uppercase; letter-spacing: .04em;
+  }
+  .member-card-detail-field strong {
+    display: block; font-size: 11px; font-weight: 650;
+    color: var(--ink); margin-top: 2px;
+    overflow-wrap: anywhere;
+  }
+  .member-card-detail-actions {
+    display: flex; gap: 6px; flex-wrap: wrap;
+    padding-top: 10px; border-top: 1px solid var(--line);
+  }
+
+  /* Pagination */
+  #members-page .module-pagination {
+    display: flex; justify-content: space-between;
+    align-items: center; gap: 10px;
+    padding: 9px 14px;
+    color: var(--muted); font-size: 10px;
+    border-top: 1px solid var(--line);
+    flex-wrap: wrap;
+  }
+
+  /* ── PHONE: switch from table to card layout ── */
+  @media (max-width: 700px) {
+    #members-page .members-directory-scroll { display: none; }
+    .members-card-list { display: block; }
+
+    #members-page .member-actions-row { padding: 10px 12px; }
+    #members-page .module-search { flex: 1 1 100%; }
+    #members-page .action-buttons {
+      width: 100%; justify-content: flex-start; gap: 5px;
+    }
+    #members-page .module-button {
+      flex: 1 1 auto;
+      justify-content: center;
+      font-size: 10px;
+      min-height: 32px;
+      padding: 0 8px;
+    }
+    #members-page .member-filter-row { padding: 6px 12px; gap: 5px; }
+    #members-page .module-pagination { padding: 8px 12px; }
+  }
+
+  /* ── TABLET (701–900px): keep table but trim columns ── */
+  @media (min-width: 701px) and (max-width: 900px) {
+    .members-directory-table .col-birthday,
+    .members-directory-table .col-sabbath,
+    .members-directory-table .col-committees { display: none; }
+  }
+</style>
+
   <div class="module-titlebar">
-    <div><p class="eyebrow">Directory</p><h2>Members</h2><p id="member-page-count" class="module-caption">Loading member records...</p></div>
+    <div>
+      <p class="eyebrow">Directory</p>
+      <h2>Members</h2>
+      <p id="member-page-count" class="module-caption">Loading member records...</p>
+    </div>
   </div>
   <section class="module-panel">
     <div class="member-actions-row">
-      <label class="module-search"><span class="material-symbols-rounded">search</span><input id="member-page-search" type="search" placeholder="Search by full name, Member ID, or contact number..."></label>
+      <label class="module-search">
+        <span class="material-symbols-rounded">search</span>
+        <input id="member-page-search" type="search" placeholder="Search by full name, Member ID, or contact number...">
+      </label>
       <div class="action-buttons">
-        <button id="trash-members-button" class="module-button" type="button"><span class="material-symbols-rounded">delete</span>Trash <span id="trash-count" class="count-chip">0</span></button>
-        <button id="add-member-button" class="module-button primary" type="button"><span class="material-symbols-rounded">person_add</span>Add Member</button>
-        <button id="import-members-button" class="module-button" type="button"><span class="material-symbols-rounded">upload</span>Import Data</button>
-        <button id="export-members-button" class="module-button" type="button"><span class="material-symbols-rounded">download</span>Export</button>
+        <button id="trash-members-button" class="module-button" type="button">
+          <span class="material-symbols-rounded">delete</span>Trash <span id="trash-count" class="count-chip">0</span>
+        </button>
+        <button id="add-member-button" class="module-button primary" type="button">
+          <span class="material-symbols-rounded">person_add</span>Add Member
+        </button>
+        <button id="import-members-button" class="module-button" type="button">
+          <span class="material-symbols-rounded">upload</span>Import Data
+        </button>
+        <button id="export-members-button" class="module-button" type="button">
+          <span class="material-symbols-rounded">download</span>Export
+        </button>
         <input id="member-csv-file" type="file" accept=".csv,text/csv" hidden>
       </div>
     </div>
     <div class="member-filter-row">
       <span class="filter-label"><span class="material-symbols-rounded">filter_list</span>Filters:</span>
-      <select id="member-status-filter" class="module-select"><option value="">All Membership Statuses</option><option selected>Active</option><option>Inactive</option><option>On &amp; Off</option></select>
-      <select id="member-category-filter" class="module-select"><option value="">All Categories</option><option>Junior</option><option>Senior</option></select>
-      <select id="member-activity-filter" class="module-select"><option value="">All Activity Statuses</option><option>Regular</option><option>Active</option><option>At Risk</option></select>
-      <select id="member-committee-filter" class="module-select committee-select"><option value="">All Committees</option></select>
+      <select id="member-status-filter" class="module-select">
+        <option value="">All Membership Statuses</option>
+        <option selected>Active</option>
+        <option>Inactive</option>
+        <option>On &amp; Off</option>
+      </select>
+      <select id="member-category-filter" class="module-select">
+        <option value="">All Categories</option>
+        <option>Junior</option>
+        <option>Senior</option>
+      </select>
+      <select id="member-activity-filter" class="module-select">
+        <option value="">All Activity Statuses</option>
+        <option>Regular</option>
+        <option>Active</option>
+        <option>At Risk</option>
+      </select>
+      <select id="member-committee-filter" class="module-select committee-select">
+        <option value="">All Committees</option>
+      </select>
       <span id="member-filter-count" class="filter-count"></span>
     </div>
+
+    <!-- Desktop / Tablet: traditional data table -->
     <div class="module-table-scroll members-directory-scroll">
       <table class="module-table members-directory-table">
-        <thead><tr><th>Member ID</th><th>Full Name</th><th>Birthday</th><th>Sabbath Date</th><th>Category</th><th>Membership Status</th><th>Activity Status</th><th>Committees</th><th>Attendance Rate</th><th>Last Attended</th><th>Actions</th></tr></thead>
-        <tbody id="members-directory-rows"><tr><td colspan="11" class="module-empty">Loading members...</td></tr></tbody>
+        <thead>
+          <tr>
+            <th>Member ID</th>
+            <th>Full Name</th>
+            <th class="col-birthday">Birthday</th>
+            <th class="col-sabbath">Sabbath Date</th>
+            <th>Category</th>
+            <th>Membership Status</th>
+            <th>Activity Status</th>
+            <th class="col-committees">Committees</th>
+            <th>Attendance Rate</th>
+            <th>Last Attended</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="members-directory-rows">
+          <tr><td colspan="11" class="module-empty">Loading members...</td></tr>
+        </tbody>
       </table>
     </div>
-    <div class="module-pagination"><span id="members-page-range"></span><div id="members-page-buttons"></div></div>
+
+    <!-- Mobile: card list (populated by renderMembersDirectory) -->
+    <div class="members-card-list" id="members-card-list" aria-label="Members card list"></div>
+
+    <div class="module-pagination">
+      <span id="members-page-range"></span>
+      <div id="members-page-buttons"></div>
+    </div>
   </section>
 </section>
 
 <dialog id="member-editor" class="module-dialog">
   <form id="member-editor-form" method="dialog">
-    <div class="dialog-heading"><div><p class="eyebrow">Member record</p><h2 id="member-editor-title">Add Member</h2></div><button class="icon-button" type="button" data-close-dialog="member-editor" aria-label="Close"><span class="material-symbols-rounded">close</span></button></div>
+    <div class="dialog-heading">
+      <div><p class="eyebrow">Member record</p><h2 id="member-editor-title">Add Member</h2></div>
+      <button class="icon-button" type="button" data-close-dialog="member-editor" aria-label="Close">
+        <span class="material-symbols-rounded">close</span>
+      </button>
+    </div>
     <div class="form-grid">
       <label>Member ID<input id="edit-member-id" name="memberId" required maxlength="40" placeholder="M-1065"></label>
-      <label>Full name<input id="edit-member-name" name="fullName" maxlength="160" placeholder="Full name"></label>
+      <label>Full name<input id="edit-member-name" name="fullName" required maxlength="160" placeholder="Full name"></label>
       <label>Contact number<input id="edit-member-contact" name="contactNumber" maxlength="40" placeholder="Contact number"></label>
       <label>Email<input id="edit-member-email" name="email" type="email" maxlength="160"></label>
       <label>Age<input id="edit-member-age" name="age" type="number" min="0" max="120"></label>
@@ -55,17 +293,38 @@
       <label class="form-wide">Notes<textarea id="edit-member-notes" name="notes" rows="3"></textarea></label>
     </div>
     <p class="module-help">Clean formatting: Phone numbers automatically normalize to +639 format. Dates sync with official demographic &amp; attendance tabs.</p>
-    <div class="dialog-actions"><button class="module-button" type="button" data-close-dialog="member-editor">Cancel</button><button id="save-member-button" class="module-button primary" type="submit">Save Member</button></div>
+    <div class="dialog-actions">
+      <button class="module-button" type="button" data-close-dialog="member-editor">Cancel</button>
+      <button id="save-member-button" class="module-button primary" type="submit">Save Member</button>
+    </div>
   </form>
 </dialog>
 
 <dialog id="member-trash-dialog" class="module-dialog">
-  <div class="dialog-heading"><div><p class="eyebrow">Removed records</p><h2>Member Trash</h2></div><button class="icon-button" type="button" data-close-dialog="member-trash-dialog" aria-label="Close"><span class="material-symbols-rounded">close</span></button></div>
-  <div class="module-table-scroll"><table class="module-table"><thead><tr><th>Member ID</th><th>Name</th><th>Actions</th></tr></thead><tbody id="trash-member-rows"><tr><td colspan="3" class="module-empty">Loading trash...</td></tr></tbody></table></div>
+  <div class="dialog-heading">
+    <div><p class="eyebrow">Removed records</p><h2>Member Trash</h2></div>
+    <button class="icon-button" type="button" data-close-dialog="member-trash-dialog" aria-label="Close">
+      <span class="material-symbols-rounded">close</span>
+    </button>
+  </div>
+  <div class="module-table-scroll">
+    <table class="module-table">
+      <thead><tr><th>Member ID</th><th>Name</th><th>Actions</th></tr></thead>
+      <tbody id="trash-member-rows"><tr><td colspan="3" class="module-empty">Loading trash...</td></tr></tbody>
+    </table>
+  </div>
 </dialog>
 
 <script>
   const membersPageState = { rows: [], trash: [], page: 1, pageSize: 25, editId: null, expandedMember: null };
+
+  /* ── helpers ── */
+  function memberInitials(name) {
+    const words = String(name || '').replace(/^(BRO\.|SIS\.)\s*/i, '').trim().split(/\s+/);
+    return (words[0]?.[0] || '') + (words[1]?.[0] || '');
+  }
+
+  function isPhoneView() { return window.matchMedia('(max-width: 700px)').matches; }
 
   async function loadMembersPage() {
     if (state.page !== 'Members') return;
@@ -90,63 +349,238 @@
       (!status || member.membershipStatus.toLowerCase() === status) &&
       (!category || member.category.toLowerCase() === category) &&
       (!activity || member.activityStatus.toLowerCase() === activity) &&
-      (!committee || member.committees.toLowerCase().split(/[,;]+/).map(value => value.trim()).includes(committee))
+      (!committee || member.committees.toLowerCase().split(/[,;]+/).map(v => v.trim()).includes(committee))
     );
   }
 
   function renderMembersDirectory() {
     const rows = selectedMembers();
-    const tbody = document.getElementById('members-directory-rows');
     const totalPages = Math.max(1, Math.ceil(rows.length / membersPageState.pageSize));
     membersPageState.page = Math.min(membersPageState.page, totalPages);
     const first = (membersPageState.page - 1) * membersPageState.pageSize;
     const visible = rows.slice(first, first + membersPageState.pageSize);
+
     document.getElementById('member-page-count').textContent = `${formatNumber(membersPageState.rows.length)} total member records`;
     document.getElementById('member-filter-count').textContent = `Found ${formatNumber(rows.length)} member(s)`;
-    document.getElementById('members-page-range').textContent = rows.length ? `Showing ${first + 1}–${Math.min(first + membersPageState.pageSize, rows.length)} of ${rows.length}` : 'No members found';
+    document.getElementById('members-page-range').textContent = rows.length
+      ? `Showing ${first + 1}–${Math.min(first + membersPageState.pageSize, rows.length)} of ${rows.length}`
+      : 'No members found';
+
+    if (isPhoneView()) {
+      renderMobileCards(visible);
+    } else {
+      renderDesktopTable(visible);
+    }
+
+    renderMemberPageButtons(totalPages);
+    syncCommitteeFilter();
+  }
+
+  /* ── Desktop table ── */
+  function renderDesktopTable(visible) {
+    const tbody = document.getElementById('members-directory-rows');
     tbody.replaceChildren();
     if (!visible.length) {
-      const row = document.createElement('tr'); const cell = document.createElement('td');
-      cell.colSpan = 11; cell.className = 'module-empty'; cell.textContent = 'No members match these filters.'; row.appendChild(cell); tbody.appendChild(row);
+      const row = document.createElement('tr');
+      const cell = document.createElement('td');
+      cell.colSpan = 11; cell.className = 'module-empty';
+      cell.textContent = 'No members match these filters.';
+      row.appendChild(cell); tbody.appendChild(row); return;
     }
     visible.forEach(member => {
       const row = document.createElement('tr'); row.className = 'directory-member-row';
       const id = document.createElement('td'); id.className = 'id-cell'; id.textContent = member.memberId;
-      const name = document.createElement('td'); name.innerHTML = `<strong>${escapeHtml(member.name || 'Name not recorded')}</strong>${member.contactNumber ? `<small>${escapeHtml(member.contactNumber)}</small>` : ''}${member.age ? `<small>${escapeHtml(member.age)} yrs</small>` : ''}`;
-      const birthday = document.createElement('td'); birthday.textContent = member.birthday || '—';
-      const sabbathDate = document.createElement('td'); sabbathDate.textContent = member.sabbathDate || '—';
+      const name = document.createElement('td');
+      name.innerHTML = `<strong>${escapeHtml(member.name || 'Name not recorded')}</strong>${member.contactNumber ? `<small>${escapeHtml(member.contactNumber)}</small>` : ''}${member.age ? `<small>${escapeHtml(member.age)} yrs</small>` : ''}`;
+      const birthday = document.createElement('td'); birthday.className = 'col-birthday'; birthday.textContent = member.birthday || '—';
+      const sabbathDate = document.createElement('td'); sabbathDate.className = 'col-sabbath'; sabbathDate.textContent = member.sabbathDate || '—';
       const category = document.createElement('td'); category.appendChild(makeBadge(member.category, 'purple'));
-      const status = document.createElement('td'); status.appendChild(makeBadge(member.membershipStatus, member.membershipStatus === 'Active' ? 'green' : member.membershipStatus === 'Inactive' ? 'red' : 'amber'));
-      const activity = document.createElement('td'); activity.appendChild(makeBadge(member.activityStatus || 'No data', member.activityStatus === 'Regular' ? 'blue' : member.activityStatus === 'At Risk' ? 'amber' : 'blue'));
-      const committees = document.createElement('td');
-      String(member.committees || '').split(/[,;]+/).map(value => value.trim()).filter(Boolean).slice(0, 3).forEach(value => committees.appendChild(makeBadge(value, 'quiet')));
+      const status = document.createElement('td');
+      status.appendChild(makeBadge(member.membershipStatus, member.membershipStatus === 'Active' ? 'green' : member.membershipStatus === 'Inactive' ? 'red' : 'amber'));
+      const activity = document.createElement('td');
+      activity.appendChild(makeBadge(member.activityStatus || 'No data', member.activityStatus === 'Regular' ? 'blue' : member.activityStatus === 'At Risk' ? 'amber' : 'blue'));
+      const committees = document.createElement('td'); committees.className = 'col-committees';
+      String(member.committees || '').split(/[,;]+/).map(v => v.trim()).filter(Boolean).slice(0, 3).forEach(v => committees.appendChild(makeBadge(v, 'quiet')));
       const rate = document.createElement('td'); rate.className = 'rate-cell'; rate.textContent = formatPercent(member.attendancePercent, 0);
       const last = document.createElement('td'); last.textContent = member.lastAttendanceDate || '—';
       const actions = document.createElement('td'); actions.className = 'row-actions';
       const viewButton = actionButton('visibility', 'View member', () => showMemberDetails(member));
       viewButton.setAttribute('aria-expanded', String(membersPageState.expandedMember === member.memberId));
       actions.append(viewButton, actionButton('edit', 'Edit member', () => openMemberEditor(member)), actionButton('inventory_2', 'Mark inactive', (e) => archiveMemberFromPage(member, e.currentTarget)), actionButton('delete', 'Move to Trash', (e) => trashMemberFromPage(member, e.currentTarget)));
-      row.append(id, name, birthday, sabbathDate, category, status, activity, committees, rate, last, actions); tbody.appendChild(row);
+      row.append(id, name, birthday, sabbathDate, category, status, activity, committees, rate, last, actions);
+      tbody.appendChild(row);
       if (membersPageState.expandedMember === member.memberId) tbody.appendChild(renderDirectoryMemberDetails(member));
     });
-    renderMemberPageButtons(totalPages);
+  }
+
+  /* ── Mobile card list ── */
+  function renderMobileCards(visible) {
+    const container = document.getElementById('members-card-list');
+    container.replaceChildren();
+
+    if (!visible.length) {
+      const empty = document.createElement('p');
+      empty.className = 'module-empty'; empty.style.padding = '20px 14px';
+      empty.textContent = 'No members match these filters.';
+      container.appendChild(empty); return;
+    }
+
+    visible.forEach(member => {
+      const isExpanded = membersPageState.expandedMember === member.memberId;
+      const pct = member.attendancePercent;
+      const isAtRisk = member.activityStatus === 'At Risk';
+
+      /* card wrapper */
+      const card = document.createElement('div');
+      card.className = 'member-card';
+      card.setAttribute('role', 'button');
+      card.setAttribute('aria-expanded', String(isExpanded));
+      card.setAttribute('tabindex', '0');
+
+      /* avatar */
+      const avatar = document.createElement('div');
+      avatar.className = 'member-card-avatar';
+      avatar.textContent = memberInitials(member.name).toUpperCase() || '?';
+
+      /* body */
+      const body = document.createElement('div');
+      body.className = 'member-card-body';
+
+      /* top row: name + id */
+      const top = document.createElement('div');
+      top.className = 'member-card-top';
+      const nameEl = document.createElement('div');
+      nameEl.className = 'member-card-name';
+      nameEl.textContent = member.name || 'Name not recorded';
+      const idEl = document.createElement('div');
+      idEl.className = 'member-card-id';
+      idEl.textContent = member.memberId;
+      top.append(nameEl, idEl);
+
+      /* contact */
+      if (member.contactNumber) {
+        const contact = document.createElement('span');
+        contact.className = 'member-card-contact';
+        contact.textContent = member.contactNumber;
+        top.appendChild(contact);
+      }
+
+      /* badges */
+      const badges = document.createElement('div');
+      badges.className = 'member-card-badges';
+      badges.appendChild(makeBadge(member.membershipStatus, member.membershipStatus === 'Active' ? 'green' : member.membershipStatus === 'Inactive' ? 'red' : 'amber'));
+      badges.appendChild(makeBadge(member.activityStatus || 'No data', member.activityStatus === 'Regular' ? 'blue' : isAtRisk ? 'amber' : 'blue'));
+      badges.appendChild(makeBadge(member.category, 'purple'));
+
+      /* meta: attendance + date + actions */
+      const meta = document.createElement('div');
+      meta.className = 'member-card-meta';
+
+      const rateEl = document.createElement('span');
+      rateEl.className = 'member-card-rate' + (isAtRisk ? ' at-risk' : '');
+      rateEl.textContent = formatPercent(pct, 0) + ' attendance';
+
+      const lastEl = document.createElement('span');
+      lastEl.className = 'member-card-last';
+      lastEl.textContent = member.lastAttendanceDate ? `Last: ${member.lastAttendanceDate}` : 'Never attended';
+
+      /* card action buttons */
+      const actionsEl = document.createElement('div');
+      actionsEl.className = 'member-card-actions';
+      actionsEl.addEventListener('click', e => e.stopPropagation()); /* don't expand on btn click */
+      actionsEl.append(
+        actionButton('edit', 'Edit member', () => openMemberEditor(member)),
+        actionButton('inventory_2', 'Mark inactive', (e) => archiveMemberFromPage(member, e.currentTarget)),
+        actionButton('delete', 'Move to Trash', (e) => trashMemberFromPage(member, e.currentTarget))
+      );
+
+      meta.append(rateEl, lastEl);
+      body.append(top, badges, meta);
+      card.append(avatar, body, actionsEl);
+
+      /* tap card to toggle detail panel */
+      const toggleDetail = () => {
+        membersPageState.expandedMember = membersPageState.expandedMember === member.memberId ? null : member.memberId;
+        card.setAttribute('aria-expanded', String(membersPageState.expandedMember === member.memberId));
+        detail.classList.toggle('open', membersPageState.expandedMember === member.memberId);
+      };
+      card.addEventListener('click', toggleDetail);
+      card.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleDetail(); } });
+
+      /* expandable detail panel */
+      const detail = document.createElement('div');
+      detail.className = 'member-card-detail' + (isExpanded ? ' open' : '');
+
+      const detailGrid = document.createElement('div');
+      detailGrid.className = 'member-card-detail-grid';
+      [
+        ['Member ID', member.memberId], ['Full Name', member.name],
+        ['Contact', member.contactNumber], ['Email', member.email],
+        ['Birthday', member.birthday], ['Sabbath Date', member.sabbathDate],
+        ['Gender', member.gender], ['Age', member.age],
+        ['Category', member.category], ['Membership', member.membershipStatus],
+        ['Activity', member.activityStatus], ['Student Status', member.studentStatus],
+        ['Employment', member.employmentStatus], ['Committees', member.committees],
+        ['Attendance', formatPercent(member.attendancePercent)],
+        ['Last Attended', member.lastAttendanceDate],
+        ['Registered', member.dateRegistered],
+        ['Total Sessions', formatNumber(member.attendanceCount)],
+        ['Notes', member.notes]
+      ].forEach(([label, value]) => {
+        const field = document.createElement('div');
+        field.className = 'member-card-detail-field';
+        const lbl = document.createElement('span'); lbl.textContent = label;
+        const val = document.createElement('strong');
+        val.textContent = value === null || value === undefined || value === '' ? '—' : String(value);
+        field.append(lbl, val); detailGrid.appendChild(field);
+      });
+
+      const detailActions = document.createElement('div');
+      detailActions.className = 'member-card-detail-actions';
+      detailActions.append(
+        directoryDetailAction('Edit', 'edit', () => openMemberEditor(member)),
+        directoryDetailAction('Archive', 'inventory_2', (e) => archiveMemberFromPage(member, e.currentTarget)),
+        directoryDetailAction('Delete', 'delete', (e) => trashMemberFromPage(member, e.currentTarget))
+      );
+      detail.append(detailGrid, detailActions);
+
+      container.append(card, detail);
+    });
+  }
+
+  /* ── Shared helpers ── */
+  function renderMemberPageButtons(totalPages) {
+    const container = document.getElementById('members-page-buttons');
+    container.replaceChildren();
+    const previous = document.createElement('button');
+    previous.className = 'page-button'; previous.textContent = '‹';
+    previous.disabled = membersPageState.page <= 1;
+    previous.onclick = () => { membersPageState.page -= 1; renderMembersDirectory(); };
+    const next = document.createElement('button');
+    next.className = 'page-button'; next.textContent = '›';
+    next.disabled = membersPageState.page >= totalPages;
+    next.onclick = () => { membersPageState.page += 1; renderMembersDirectory(); };
+    container.append(previous, next);
+  }
+
+  function syncCommitteeFilter() {
     const committeeSelect = document.getElementById('member-committee-filter');
     const selected = committeeSelect.value;
-    const committees = [...new Set(membersPageState.rows.flatMap(member => String(member.committees || '').split(/[,;]+/).map(value => value.trim()).filter(Boolean)))].sort();
+    const committees = [...new Set(
+      membersPageState.rows.flatMap(m => String(m.committees || '').split(/[,;]+/).map(v => v.trim()).filter(Boolean))
+    )].sort();
     committeeSelect.replaceChildren(new Option('All Committees', ''));
-    committees.forEach(value => committeeSelect.add(new Option(value, value.toLowerCase())));
+    committees.forEach(v => committeeSelect.add(new Option(v, v.toLowerCase())));
     committeeSelect.value = selected;
   }
 
-  function renderMemberPageButtons(totalPages) {
-    const container = document.getElementById('members-page-buttons'); container.replaceChildren();
-    const previous = document.createElement('button'); previous.className = 'page-button'; previous.textContent = '‹'; previous.disabled = membersPageState.page <= 1; previous.onclick = () => { membersPageState.page -= 1; renderMembersDirectory(); }; container.appendChild(previous);
-    const next = document.createElement('button'); next.className = 'page-button'; next.textContent = '›'; next.disabled = membersPageState.page >= totalPages; next.onclick = () => { membersPageState.page += 1; renderMembersDirectory(); }; container.appendChild(next);
-  }
-
   function actionButton(icon, title, handler) {
-    const button = document.createElement('button'); button.type = 'button'; button.className = 'row-icon-button'; button.title = title; button.setAttribute('aria-label', title);
-    const glyph = document.createElement('span'); glyph.className = 'material-symbols-rounded'; glyph.textContent = icon; button.appendChild(glyph);
+    const button = document.createElement('button');
+    button.type = 'button'; button.className = 'row-icon-button';
+    button.title = title; button.setAttribute('aria-label', title);
+    const glyph = document.createElement('span');
+    glyph.className = 'material-symbols-rounded'; glyph.textContent = icon;
+    button.appendChild(glyph);
     button.addEventListener('click', event => {
       const result = handler(event);
       if (result && typeof result.then === 'function') {
@@ -202,37 +636,21 @@
   async function archiveMemberFromPage(member, triggerButton) {
     if (!window.confirm(`Mark ${member.memberId} as inactive?`)) return;
     const action = async () => {
-      try {
-        const result = await apiCall('archiveMember', member.memberId);
-        showToast(result.message, 'success');
-        await loadMembersPage();
-      } catch (error) {
-        showToast(error.message || 'Unable to update member.', 'error');
-      }
+      try { const result = await apiCall('archiveMember', member.memberId); showToast(result.message, 'success'); await loadMembersPage(); }
+      catch (error) { showToast(error.message || 'Unable to update member.', 'error'); }
     };
-    if (triggerButton && window.runButtonAction) {
-      await window.runButtonAction(triggerButton, action, 'Archiving...');
-    } else {
-      await action();
-    }
+    if (triggerButton && window.runButtonAction) { await window.runButtonAction(triggerButton, action, 'Archiving...'); }
+    else { await action(); }
   }
 
   async function trashMemberFromPage(member, triggerButton) {
     if (!window.confirm(`Move ${member.memberId} to Trash? Attendance history will be retained.`)) return;
     const action = async () => {
-      try {
-        const result = await apiCall('moveMemberToTrash', member.memberId);
-        showToast(result.message, 'success');
-        await loadMembersPage();
-      } catch (error) {
-        showToast(error.message || 'Unable to move member.', 'error');
-      }
+      try { const result = await apiCall('moveMemberToTrash', member.memberId); showToast(result.message, 'success'); await loadMembersPage(); }
+      catch (error) { showToast(error.message || 'Unable to move member.', 'error'); }
     };
-    if (triggerButton && window.runButtonAction) {
-      await window.runButtonAction(triggerButton, action, 'Deleting...');
-    } else {
-      await action();
-    }
+    if (triggerButton && window.runButtonAction) { await window.runButtonAction(triggerButton, action, 'Deleting...'); }
+    else { await action(); }
   }
 
   function renderDirectoryMemberDetails(member) {
@@ -286,10 +704,16 @@
     try {
       membersPageState.trash = await apiCall('getDeletedMembers');
       document.getElementById('trash-count').textContent = formatNumber(membersPageState.trash.length);
-      if (!membersPageState.trash.length) { const row = body.insertRow(); const cell = row.insertCell(); cell.colSpan = 3; cell.className = 'module-empty'; cell.textContent = 'Trash is empty.'; }
+      if (!membersPageState.trash.length) {
+        const row = body.insertRow(); const cell = row.insertCell();
+        cell.colSpan = 3; cell.className = 'module-empty'; cell.textContent = 'Trash is empty.';
+      }
       membersPageState.trash.forEach(member => {
-        const row = body.insertRow(); row.insertCell().textContent = member.memberId; row.insertCell().textContent = member.name || 'Name not recorded';
-        const actions = row.insertCell(); actions.appendChild(actionButton('restore', 'Restore member', async () => {
+        const row = body.insertRow();
+        row.insertCell().textContent = member.memberId;
+        row.insertCell().textContent = member.name || 'Name not recorded';
+        const actions = row.insertCell();
+        actions.appendChild(actionButton('restore', 'Restore member', async () => {
           try { const result = await apiCall('restoreDeletedMember', member.memberId); showToast(result.message, 'success'); await showMemberTrash(); await loadMembersPage(); }
           catch (error) { showToast(error.message || 'Unable to restore member.', 'error'); }
         }));
@@ -309,7 +733,7 @@
       else cell += char;
     }
     if (cell || row.length) { row.push(cell); rows.push(row); }
-    return rows.filter(line => line.some(value => value.trim()));
+    return rows.filter(line => line.some(v => v.trim()));
   }
 
   async function importMemberCsv(file) {
@@ -317,8 +741,8 @@
     try {
       const rows = parseMemberCsv(await file.text());
       if (rows.length < 2) throw new Error('The CSV needs a header row and at least one member.');
-      const headers = rows[0].map(value => value.trim().toLowerCase().replace(/[^a-z0-9]/g, ''));
-      const column = aliases => headers.findIndex(header => aliases.includes(header));
+      const headers = rows[0].map(v => v.trim().toLowerCase().replace(/[^a-z0-9]/g, ''));
+      const column = aliases => headers.findIndex(h => aliases.includes(h));
       const objects = rows.slice(1).map(row => ({
         memberId: row[column(['memberid'])] || '', fullName: row[column(['fullname', 'membername', 'name'])] || '',
         contactNumber: row[column(['contactnumber', 'phonenumber', 'mobilenumber', 'phone'])] || '',
@@ -327,7 +751,7 @@
         birthday: row[column(['birthday', 'birthdate', 'dateofbirth'])] || '',
         sabbathDate: row[column(['sabbathdate', 'sabbath'])] || '', committees: row[column(['committees'])] || '',
         studentStatus: row[column(['studentstatus'])] || '', employmentStatus: row[column(['employmentstatus'])] || '', notes: row[column(['notes'])] || ''
-      })).filter(member => member.memberId);
+      })).filter(m => m.memberId);
       if (!objects.length) throw new Error('No rows contain a Member ID column value.');
       const result = await apiCall('importMembers', objects); showToast(result.message, 'success'); await loadMembersPage();
     } catch (error) { showToast(error.message || 'CSV import failed.', 'error'); }
@@ -337,14 +761,26 @@
   function exportMembersCsv() {
     const data = selectedMembers();
     const columns = ['Member ID','Full Name','Contact Number','Birthday','Sabbath Date','Membership Status','Member Category','Activity Status','Committees','Attendance Percentage','Last Attendance Date'];
-    const rows = [columns, ...data.map(member => [member.memberId,member.name,member.contactNumber,member.birthday,member.sabbathDate,member.membershipStatus,member.category,member.activityStatus,member.committees,member.attendancePercent === null ? '' : (member.attendancePercent * 100).toFixed(1) + '%',member.lastAttendanceDate])];
-    const csv = rows.map(row => row.map(value => `"${String(value ?? '').replace(/"/g, '""')}"`).join(',')).join('\r\n');
-    const link = document.createElement('a'); link.href = URL.createObjectURL(new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8' })); link.download = 'members.csv'; link.click(); URL.revokeObjectURL(link.href);
+    const rows = [columns, ...data.map(m => [m.memberId,m.name,m.contactNumber,m.birthday,m.sabbathDate,m.membershipStatus,m.category,m.activityStatus,m.committees,m.attendancePercent === null ? '' : (m.attendancePercent * 100).toFixed(1) + '%',m.lastAttendanceDate])];
+    const csv = rows.map(row => row.map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(',')).join('\r\n');
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8' }));
+    link.download = 'members.csv'; link.click(); URL.revokeObjectURL(link.href);
     logAction('EXPORT_MEMBERS', { count: data.length });
   }
 
+  /* Re-render on window resize so table ↔ cards swap correctly */
+  const _membersResizeObserver = new ResizeObserver(() => {
+    if (state.page === 'Members') renderMembersDirectory();
+  });
+  _membersResizeObserver.observe(document.documentElement);
+
   function bindMembersPage() {
-    ['member-page-search','member-status-filter','member-category-filter','member-activity-filter','member-committee-filter'].forEach(id => document.getElementById(id).addEventListener(id === 'member-page-search' ? 'input' : 'change', () => { membersPageState.page = 1; renderMembersDirectory(); }));
+    ['member-page-search','member-status-filter','member-category-filter','member-activity-filter','member-committee-filter']
+      .forEach(id => document.getElementById(id).addEventListener(
+        id === 'member-page-search' ? 'input' : 'change',
+        () => { membersPageState.page = 1; renderMembersDirectory(); }
+      ));
     document.getElementById('add-member-button').addEventListener('click', () => openMemberEditor(null));
     document.getElementById('member-editor-form').addEventListener('submit', submitMemberForm);
     document.getElementById('trash-members-button').addEventListener('click', event => window.runButtonAction(event.currentTarget, showMemberTrash, 'Loading trash...'));

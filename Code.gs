@@ -1850,6 +1850,11 @@ function saveMember(memberData) {
     const column = attendanceFindColumn_(headers, aliases[key]);
     if (column >= 0) values[column] = key === 'birthday' ? birthday : key === 'sabbathDate' ? sabbathDate : input[key];
   });
+  if (input.fullName !== undefined && schema.fullName < 0) {
+    const nameColumns = [schema.firstName, schema.middleName, schema.lastName].filter(column => column >= 0);
+    nameColumns.forEach(column => { values[column] = ''; });
+    if (nameColumns.length) values[nameColumns[0]] = String(input.fullName || '').trim();
+  }
   if (!input.isEdit) values[schema.memberId] = memberId;
   if (!input.isEdit && schema.dateRegistered >= 0 && !values[schema.dateRegistered]) values[schema.dateRegistered] = new Date();
   if (schema.updatedAt >= 0) values[schema.updatedAt] = new Date();

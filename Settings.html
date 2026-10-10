@@ -180,7 +180,7 @@
     <div class="settings-hero">
       <div>
         <h2>System Display &amp; Visibility Settings</h2>
-        <p>Adjust system font scaling and contrast preferences. Settings apply system-wide across all pages and persist automatically.</p>
+        <p>Adjust font scale and contrast. Scaling enlarges text <em>and</em> layout proportionally — the sidebar, spacing, and buttons all grow together — so everything stays readable and usable on phone, tablet, and desktop.</p>
       </div>
       <div class="settings-badge" id="settings-status-badge">
         <span class="material-symbols-rounded" style="font-size: 16px;">zoom_in</span>
@@ -197,7 +197,7 @@
           </div>
           <div>
             <h3>System Font Size &amp; Zoom Scale</h3>
-            <p>Make all fonts, text labels, tables, and buttons larger and easier to read across the whole application.</p>
+            <p>Scales all text, labels, tables, and buttons — <strong>and</strong> the sidebar, topbar, and spacing — proportionally. The UI automatically adapts to phone, tablet, and desktop at any scale level.</p>
           </div>
         </div>
       </div>
@@ -216,9 +216,15 @@
           <span class="preset-desc">+10% larger text</span>
           <span class="material-symbols-rounded active-check">check_circle</span>
         </button>
-        <button class="scale-preset-btn active" type="button" data-scale="1.2">
+        <button class="scale-preset-btn active" type="button" data-scale="1.15">
+          <span class="preset-pct">115%</span>
+          <span class="preset-label">Default (Recommended)</span>
+          <span class="preset-desc">Balanced readability</span>
+          <span class="material-symbols-rounded active-check">check_circle</span>
+        </button>
+        <button class="scale-preset-btn" type="button" data-scale="1.2">
           <span class="preset-pct">120%</span>
-          <span class="preset-label">Large (Recommended)</span>
+          <span class="preset-label">Large</span>
           <span class="preset-desc">Optimal readability</span>
           <span class="material-symbols-rounded active-check">check_circle</span>
         </button>
@@ -241,10 +247,10 @@
         <span class="slider-label">Fine-tune Font Scale</span>
         <div class="slider-control-wrap">
           <button id="scale-step-down" class="slider-step-btn" type="button" title="Decrease font scale" aria-label="Decrease font scale">−</button>
-          <input id="scale-slider" class="slider-input" type="range" min="95" max="145" step="5" value="120" aria-label="Font scale percentage">
+          <input id="scale-slider" class="slider-input" type="range" min="95" max="145" step="5" value="115" aria-label="Font scale percentage">
           <button id="scale-step-up" class="slider-step-btn" type="button" title="Increase font scale" aria-label="Increase font scale">+</button>
         </div>
-        <span id="slider-val-badge" class="slider-val-badge">120%</span>
+        <span id="slider-val-badge" class="slider-val-badge">115%</span>
       </div>
     </article>
 
@@ -336,7 +342,7 @@
     <!-- Actions / Save Toolbar -->
     <div class="settings-actions">
       <div>
-        <span id="settings-summary-info" class="settings-current-info">Current preference: 120% Font Scale · Boost Small Labels On</span>
+        <span id="settings-summary-info" class="settings-current-info">Current preference: 115% Font Scale · Boost Small Labels On</span>
       </div>
       <div class="settings-actions-group">
         <button id="settings-reset-btn" class="reset-settings-btn" type="button">Reset to Defaults</button>
@@ -351,20 +357,20 @@
 
 <script>
   let settingsState = {
-    selectedScale: 1.20,
+    selectedScale: 1.15,
     minFont: true,
     contrast: false,
     spacing: true
   };
 
   function loadSettingsModule() {
-    // Read stored preferences
-    const storedScale = parseFloat(localStorage.getItem('attendance-system-font-scale') || '1.20');
+    // Read stored preferences; default scale is 1.15 to match dashboard initial load
+    const storedScale = parseFloat(localStorage.getItem('attendance-system-font-scale') || '1.15');
     const storedMinFont = localStorage.getItem('attendance-system-min-font') !== 'false';
     const storedContrast = localStorage.getItem('attendance-system-contrast') === 'true';
     const storedSpacing = localStorage.getItem('attendance-system-spacing') !== 'false';
 
-    settingsState.selectedScale = isNaN(storedScale) ? 1.20 : storedScale;
+    settingsState.selectedScale = isNaN(storedScale) ? 1.15 : storedScale;
     settingsState.minFont = storedMinFont;
     settingsState.contrast = storedContrast;
     settingsState.spacing = storedSpacing;
@@ -452,22 +458,22 @@
   }
 
   function resetSettingsAction() {
-    settingsState.selectedScale = 1.0;
+    settingsState.selectedScale = 1.15;
     settingsState.minFont = true;
     settingsState.contrast = false;
-    settingsState.spacing = false;
+    settingsState.spacing = true;
     updateSettingsUi();
 
-    localStorage.setItem('attendance-system-font-scale', '1.0');
+    localStorage.setItem('attendance-system-font-scale', '1.15');
     localStorage.setItem('attendance-system-min-font', 'true');
     localStorage.setItem('attendance-system-contrast', 'false');
-    localStorage.setItem('attendance-system-spacing', 'false');
+    localStorage.setItem('attendance-system-spacing', 'true');
 
     if (typeof window.applySystemDisplaySettings === 'function') {
-      window.applySystemDisplaySettings({ scale: 1.0, contrast: false, minFont: true, spacing: false });
+      window.applySystemDisplaySettings({ scale: 1.15, contrast: false, minFont: true, spacing: true });
     }
 
-    showToast('Display settings reset to standard 100% defaults.', 'success');
+    showToast('Display settings reset to recommended 115% defaults.', 'success');
   }
 
   function bindSettingsEvents() {
