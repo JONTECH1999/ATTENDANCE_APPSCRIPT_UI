@@ -36,7 +36,7 @@
 </dialog>
 
 <script>
-  const fastAttendanceState = { members: [], events: [], records: [], marks: Object.create(null), eventId: '', scheduleId: '', date: '', requestedDate: '', scheduleWasManuallySelected: false };
+  const fastAttendanceState = { members: [], events: [], records: [], marks: Object.create(null), eventId: '', scheduleId: '', date: '', requestedDate: '', scheduleWasManuallySelected: false, priorityEventId: '', priorityScheduleId: '' };
 
   async function loadFastAttendance() {
     if (state.page !== 'Fast Attendance') return;
@@ -46,6 +46,10 @@
       fastAttendanceState.members = result.members;
       fastAttendanceState.events = result.events;
       fastAttendanceState.records = result.records;
+      // Store special event priority: if a special event falls on the current date,
+      // it should override the default regular schedule selection.
+      fastAttendanceState.priorityEventId = result.priorityEventId || '';
+      fastAttendanceState.priorityScheduleId = result.priorityScheduleId || '';
       renderAttendanceEventOptions();
       renderAttendeeList();
       state.loadedPages['Fast Attendance'] = true;
@@ -53,40 +57,130 @@
   }
 
   function renderAttendanceEventOptions() {
-    const select = document.getElementById('attendance-event-select'); const previous = fastAttendanceState.eventId;
+    const select = document.getElementById('attendance-event-select');
+    const previous = fastAttendanceState.eventId;
     select.replaceChildren(new Option('Select an event...', ''));
     fastAttendanceState.events.forEach(event => select.add(new Option(`${event.name}${event.category ? ` (${event.category})` : ''}`, event.eventId)));
-    fastAttendanceState.eventId = fastAttendanceState.events.some(event => event.eventId === previous) ? previous : (fastAttendanceState.events[0] || {}).eventId || '';
+
+    // If a special event has priority on this date and the user has not manually
+    // chosen a different event, override selection with the special event.
+    const hasPriority = fastAttendanceState.priorityEventId &&
+      fastAttendanceState.events.some(e => e.eventId === fastAttendanceState.priorityEventId);
+    const userChoseDifferent = previous && previous !== fastAttendanceState.priorityEventId &&
+      fastAttendanceState.events.some(e => e.eventId === previous) &&
+      fastAttendanceState.scheduleWasManuallySelected;
+
+    if (hasPriority && !userChoseDifferent) {
+      fastAttendanceState.eventId = fastAttendanceState.priorityEventId;
+      // Show a subtle notice so the user knows why the selection changed
+      showToast('A special event is scheduled for this date — it has been prioritized for attendance.', 'info');
+    } else if (previous && fastAttendanceState.events.some(e => e.eventId === previous) && fastAttendanceState.scheduleWasManuallySelected) {
+      // User explicitly chose an event — keep it
+      fastAttendanceState.eventId = previous;
+    } else {
+      // Auto-select the event whose most recent past schedule matches now —
+      // this mirrors the topbar "Last · Saturday: Worship Service" display.
+      const best = findGlobalLastSchedule(fastAttendanceState.events, new Date());
+      fastAttendanceState.eventId = best ? best.event.eventId : (fastAttendanceState.events[0] || {}).eventId || '';
+      // Hint the schedule to pick so renderAttendanceSchedules uses it
+      fastAttendanceState._autoScheduleId = best ? best.schedule.scheduleId : '';
+    }
     select.value = fastAttendanceState.eventId;
     renderAttendanceSchedules();
+  }
+
+  /**
+   * Finds the globally most-recent past schedule occurrence across ALL events,
+   * mirroring the topbar "Last · Day: Event" display logic.
+   * Returns { event, schedule, start } or null.
+   */
+  function findGlobalLastSchedule(events, now) {
+    const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    let best = null;
+    (events || []).forEach(event => {
+      (event.schedules || []).forEach(schedule => {
+        const time = parseGatheringTime(schedule.time);
+        if (!time) return;
+        const oneTimeDate = !schedule.dayOfWeek && (schedule.date || event.date);
+        let start;
+        if (oneTimeDate) {
+          start = new Date(`${oneTimeDate}T00:00:00`);
+          if (isNaN(start.getTime())) return;
+          start.setHours(time.hour, time.minute, 0, 0);
+        } else {
+          const scheduleDay = String(schedule.dayOfWeek || '').trim().toLowerCase();
+          const weekdayIndex = dayNames.findIndex(d => d.toLowerCase() === scheduleDay);
+          if (weekdayIndex < 0) return;
+          const daysSince = (now.getDay() - weekdayIndex + 7) % 7;
+          start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - daysSince, time.hour, time.minute, 0, 0);
+          // If the computed time is still in the future today, step back a week
+          if (start > now) start = new Date(start.getTime() - 7 * 24 * 60 * 60 * 1000);
+        }
+        if (start <= now && (!best || start > best.start)) {
+          best = { event, schedule, start };
+        }
+      });
+    });
+    return best;
   }
 
   function currentAttendanceEvent() { return fastAttendanceState.events.find(event => event.eventId === fastAttendanceState.eventId); }
 
   function renderAttendanceSchedules() {
-    const event = currentAttendanceEvent(); const select = document.getElementById('attendance-schedule-select'); const previous = fastAttendanceState.scheduleId;
+    const event = currentAttendanceEvent();
+    const select = document.getElementById('attendance-schedule-select');
+    const previous = fastAttendanceState.scheduleId;
     const program = document.getElementById('attendance-event-program');
     program.hidden = !event || !event.program;
     document.getElementById('attendance-event-program-text').textContent = event && event.program || '';
     select.replaceChildren(new Option(event ? 'Select a schedule...' : 'Choose an event first', ''));
     if (event) event.schedules.forEach(schedule => select.add(new Option(formatScheduleOption(schedule), schedule.scheduleId)));
+
     const hasPrevious = event && event.schedules.some(schedule => String(schedule.scheduleId) === String(previous));
     const preservePrevious = Boolean(hasPrevious && fastAttendanceState.scheduleWasManuallySelected);
-    const defaultOccurrence = event && !preservePrevious ? lastAttendanceSchedule(event, new Date()) : null;
+
+    // If the currently selected event IS the priority special event and the user
+    // has not overridden the selection, use the priority schedule directly.
+    const isPriorityEvent = event && fastAttendanceState.priorityEventId &&
+      event.eventId === fastAttendanceState.priorityEventId;
+    const priorityScheduleExists = isPriorityEvent && fastAttendanceState.priorityScheduleId &&
+      event.schedules.some(s => String(s.scheduleId) === fastAttendanceState.priorityScheduleId);
+
+    // _autoScheduleId is seeded by findGlobalLastSchedule when auto-selecting an event
+    const autoScheduleId = fastAttendanceState._autoScheduleId || '';
+    const autoScheduleExists = autoScheduleId &&
+      event && event.schedules.some(s => String(s.scheduleId) === autoScheduleId);
+    // Consume the hint so it doesn't persist across manual changes
+    fastAttendanceState._autoScheduleId = '';
+
+    const defaultOccurrence = event && !preservePrevious && !priorityScheduleExists && !autoScheduleExists
+      ? lastAttendanceSchedule(event, new Date())
+      : null;
+
     fastAttendanceState.scheduleId = preservePrevious
       ? previous
-      : defaultOccurrence
-        ? String(defaultOccurrence.schedule.scheduleId)
-        : event && event.schedules[0]
-          ? String(event.schedules[0].scheduleId)
-          : '';
+      : priorityScheduleExists
+        ? fastAttendanceState.priorityScheduleId
+        : autoScheduleExists
+          ? autoScheduleId
+          : defaultOccurrence
+            ? String(defaultOccurrence.schedule.scheduleId)
+            : event && event.schedules[0]
+              ? String(event.schedules[0].scheduleId)
+              : '';
+
     select.value = fastAttendanceState.scheduleId;
     const chosen = event && event.schedules.find(schedule => String(schedule.scheduleId) === String(fastAttendanceState.scheduleId));
-    const occurrence = chosen && fastAttendanceState.requestedDate
-      ? { start: new Date(`${fastAttendanceState.requestedDate}T12:00:00`) }
-      : chosen && defaultOccurrence && String(chosen.scheduleId) === String(defaultOccurrence.schedule.scheduleId)
-      ? defaultOccurrence
-      : chosen && getAttendanceScheduleOccurrence(event, chosen, new Date(), 'nearest');
+
+    // For a priority special event, use the event's fixed date directly.
+    const occurrence = priorityScheduleExists && chosen
+      ? { start: new Date(`${chosen.date || event.date}T12:00:00`) }
+      : chosen && fastAttendanceState.requestedDate
+        ? { start: new Date(`${fastAttendanceState.requestedDate}T12:00:00`) }
+        : chosen && defaultOccurrence && String(chosen.scheduleId) === String(defaultOccurrence.schedule.scheduleId)
+          ? defaultOccurrence
+          : chosen && getAttendanceScheduleOccurrence(event, chosen, new Date(), 'nearest');
+
     fastAttendanceState.date = occurrence
       ? dateInputValue(occurrence.start)
       : (chosen && chosen.date) || (event && event.date) || dateInputValue(new Date());

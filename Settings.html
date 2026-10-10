@@ -156,9 +156,23 @@
 
     @media (max-width: 700px) {
       .settings-hero { flex-direction: column; align-items: flex-start; }
-      .slider-row { flex-direction: column; align-items: stretch; }
+      .settings-badge { align-self: flex-start; }
+      .slider-row { flex-direction: column; align-items: stretch; gap: 10px; }
+      .slider-label { min-width: auto; }
       .settings-actions { flex-direction: column; align-items: stretch; }
       .settings-actions-group { justify-content: flex-end; }
+      .scale-presets { grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); }
+      .settings-shell { gap: 12px; }
+    }
+    @media (max-width: 480px) {
+      .settings-hero { padding: 12px 14px; }
+      .settings-card { padding: 14px; gap: 12px; }
+      .scale-presets { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+      .switches-grid { grid-template-columns: 1fr; }
+      .preview-sample-row { flex-direction: column; align-items: flex-start; gap: 8px; }
+      .preview-tags { flex-wrap: wrap; }
+      .settings-actions { padding: 12px 14px; }
+      .save-settings-btn, .reset-settings-btn { width: 100%; justify-content: center; }
     }
   </style>
 

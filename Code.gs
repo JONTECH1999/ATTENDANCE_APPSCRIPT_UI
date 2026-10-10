@@ -1709,11 +1709,35 @@ function getAttendanceEvents() {
 function getFastAttendanceData(eventDate) {
   requireAttendanceAccess_();
   const dateKey = attendanceInputDateKey_(eventDate);
+  const events = getAttendanceEvents();
+  const priority = dateKey ? getSpecialEventPriority_(events, dateKey) : null;
   return {
     members: getAllMembers(),
-    events: getAttendanceEvents(),
-    records: dateKey ? getAttendanceRecords(dateKey, dateKey) : []
+    events: events,
+    records: dateKey ? getAttendanceRecords(dateKey, dateKey) : [],
+    priorityEventId: priority ? priority.eventId : '',
+    priorityScheduleId: priority ? priority.scheduleId : ''
   };
+}
+
+/**
+ * Checks if any special event falls on the given date.
+ * Returns { eventId, scheduleId } of the special event if found, else null.
+ * Special events (category = 'Special Event') with a fixed date always take
+ * priority over recurring regular schedules on the same date.
+ */
+function getSpecialEventPriority_(events, dateKey) {
+  if (!dateKey || !Array.isArray(events)) return null;
+  for (const event of events) {
+    if (!/special\s*event/i.test(String(event.category || ''))) continue;
+    for (const schedule of (event.schedules || [])) {
+      const schedDate = attendanceInputDateKey_(schedule.date || event.date);
+      if (schedDate && schedDate === dateKey) {
+        return { eventId: event.eventId, scheduleId: schedule.scheduleId };
+      }
+    }
+  }
+  return null;
 }
 
 function attendanceHeaderMap_(headers) {
